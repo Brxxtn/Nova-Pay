@@ -1,0 +1,710 @@
+
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const MAX_GIFT_CARD_BALANCE = 9998.99; // This constant was in the outline but not used in the component logic. Keeping it as requested.
+
+export default function PayStubGenerator({ open, onOpenChange, onGenerate }) {
+  const [formData, setFormData] = useState({
+    employee_name: "",
+    employee_id: "",
+    employer_name: "",
+    pay_period_start: "",
+    pay_period_end: "",
+    pay_date: "",
+    gross_pay: "", // Changed to string for input type="text"
+    hourly_rate: "", // Changed to string for input type="text"
+    hours_worked: "", // Changed to string for input type="text"
+    salary: "", // Changed to string for input type="text"
+    deductions: {
+      federal_tax: "", // Changed to string
+      state_tax: "", // Changed to string
+      social_security: "", // Changed to string
+      medicare: "", // Changed to string
+      health_insurance: "", // Changed to string
+      retirement_401k: "", // Changed to string
+      other: "" // Changed to string
+    },
+    ytd_gross: "", // Changed to string
+    ytd_net: "" // Changed to string
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [payType, setPayType] = useState("hourly");
+
+  const calculateGrossPay = () => {
+    const hourlyRate = parseFloat(formData.hourly_rate) || 0;
+    const hoursWorked = parseFloat(formData.hours_worked) || 0;
+    const salary = parseFloat(formData.salary) || 0;
+    const manualGrossPay = parseFloat(formData.gross_pay) || 0;
+
+    if (payType === "hourly" && hourlyRate > 0 && hoursWorked > 0) {
+      return hourlyRate * hoursWorked;
+    } else if (payType === "salary" && salary > 0) {
+      // Assuming annual salary is entered, and pay is bi-weekly (26 pay periods a year)
+      return salary / 26; 
+    }
+    return manualGrossPay;
+  };
+
+  // Renamed function from calculateDeductions to calculateAutoDeductions
+  const calculateAutoDeductions = (grossPay) => {
+    // These are example percentages, actual rates vary based on location and income.
+    return {
+      federal_tax: grossPay * 0.12, // 12% federal example
+      state_tax: grossPay * 0.05, // 5% state example
+      social_security: grossPay * 0.062, // 6.2% social security (up to wage base limit)
+      medicare: grossPay * 0.0145 // 1.45% medicare
+    };
+  };
+
+  const handleNumericInputChange = (e, fieldName, isDeduction = false) => {
+    const value = e.target.value;
+    // Allow empty string or valid decimal number (digits, optional single decimal point, digits)
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      if (isDeduction) {
+        setFormData(prev => ({
+          ...prev,
+          deductions: {
+            ...prev.deductions,
+            [fieldName]: value
+          }
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [fieldName]: value
+        }));
+      }
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsGenerating(true);
+
+    try {
+      const grossPay = calculateGrossPay();
+      const autoDeductions = calculateAutoDeductions(grossPay);
+      
+      // Merge auto-calculated with manual deductions, ensuring manual fields are parsed
+      const finalDeductions = {
+        federal_tax: autoDeductions.federal_tax,
+        state_tax: autoDeductions.state_tax,
+        social_security: autoDeductions.social_security,
+        medicare: autoDeductions.medicare,
+        health_insurance: parseFloat(formData.deductions.health_insurance) || 0,
+        retirement_401k: parseFloat(formData.deductions.retirement_401k) || 0,
+        other: parseFloat(formData.deductions.other) || 0
+      };
+
+      const totalDeductions = Object.values(finalDeductions).reduce((sum, val) => sum + val, 0);
+      const netPay = grossPay - totalDeductions;
+
+      // Clean up and format the data before sending
+      const cleanedData = {
+        employee_name: formData.employee_name,
+        employee_id: formData.employee_id,
+        employer_name: formData.employer_name,
+        pay_period_start: formData.pay_period_start,
+        pay_period_end: formData.pay_period_end,
+        pay_date: formData.pay_date,
+        gross_pay: parseFloat(grossPay.toFixed(2)), // Ensure gross pay is formatted
+        hourly_rate: payType === "hourly" ? (parseFloat(formData.hourly_rate) || null) : null,
+        hours_worked: payType === "hourly" ? (parseFloat(formData.hours_worked) || null) : null,
+        salary: payType === "salary" ? (parseFloat(formData.salary) || null) : null,
+        deductions: {
+          federal_tax: parseFloat(finalDeductions.federal_tax.toFixed(2)),
+          state_tax: parseFloat(finalDeductions.state_tax.toFixed(2)),
+          social_security: parseFloat(finalDeductions.social_security.toFixed(2)),
+          medicare: parseFloat(finalDeductions.medicare.toFixed(2)),
+          health_insurance: parseFloat(finalDeductions.health_insurance.toFixed(2)),
+          retirement_401k: parseFloat(finalDeductions.retirement_401k.toFixed(2)),
+          other: parseFloat(finalDeductions.other.toFixed(2)),
+        },
+        net_pay: parseFloat(netPay.toFixed(2)),
+        ytd_gross: parseFloat(formData.ytd_gross) || 0,
+        ytd_net: parseFloat(formData.ytd_net) || 0,
+        status: "generated" // Added status field
+      };
+
+      await onGenerate(cleanedData);
+
+      // Reset form
+      setFormData({
+        employee_name: "",
+        employee_id: "",
+        employer_name: "",
+        pay_period_start: "",
+        pay_period_end: "",
+        pay_date: "",
+        gross_pay: "",
+        hourly_rate: "",
+        hours_worked: "",
+        salary: "",
+        deductions: {
+          federal_tax: "",
+          state_tax: "",
+          social_security: "",
+          medicare: "",
+          health_insurance: "",
+          retirement_401k: "",
+          other: ""
+        },
+        ytd_gross: "",
+        ytd_net: ""
+      });
+      setPayType("hourly"); // Reset pay type
+    } catch (error) {
+      console.error("Error in handleSubmit:", error);
+      alert("Failed to generate pay stub. Please check all fields and ensure valid numbers are entered.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Generate Pay Stub</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="pay">Pay Details</TabsTrigger>
+              <TabsTrigger value="deductions">Deductions</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="employee_name">Employee Name *</Label>
+                  <Input
+                    id="employee_name"
+                    value={formData.employee_name}
+                    onChange={(e) => setFormData({...formData, employee_name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employee_id">Employee ID</Label>
+                  <Input
+                    id="employee_id"
+                    value={formData.employee_id}
+                    onChange={(e) => setFormData({...formData, employee_id: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="employer_name">Employer Name *</Label>
+                  <Input
+                    id="employer_name"
+                    value={formData.employer_name}
+                    onChange={(e) => setFormData({...formData, employer_name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pay_date">Pay Date *</Label>
+                  <Input
+                    id="pay_date"
+                    type="date"
+                    value={formData.pay_date}
+                    onChange={(e) => setFormData({...formData, pay_date: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pay_period_start">Pay Period Start *</Label>
+                  <Input
+                    id="pay_period_start"
+                    type="date"
+                    value={formData.pay_period_start}
+                    onChange={(e) => setFormData({...formData, pay_period_start: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pay_period_end">Pay Period End *</Label>
+                  <Input
+                    id="pay_period_end"
+                    type="date"
+                    value={formData.pay_period_end}
+                    onChange={(e) => setFormData({...formData, pay_period_end: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="pay" className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <Label>Pay Type</Label>
+                  <Select value={payType} onValueChange={setPayType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hourly">Hourly</SelectItem>
+                      <SelectItem value="salary">Salary</SelectItem>
+                      <SelectItem value="manual">Manual Entry</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {payType === "hourly" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="hourly_rate">Hourly Rate ($)</Label>
+                      <Input
+                        id="hourly_rate"
+                        type="text" // Changed from number
+                        inputMode="decimal" // Added
+                        placeholder="0.00" // Added
+                        value={formData.hourly_rate}
+                        onChange={(e) => handleNumericInputChange(e, "hourly_rate")}
+                        className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" // Added
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hours_worked">Hours Worked</Label>
+                      <Input
+                        id="hours_worked"
+                        type="text" // Changed from number
+                        inputMode="decimal" // Added
+                        placeholder="0.00" // Added
+                        value={formData.hours_worked}
+                        onChange={(e) => handleNumericInputChange(e, "hours_worked")}
+                        className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" // Added
+                      />
+                    </div>
+                  </div>
+                )}
+                
+                {payType === "salary" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="salary">Annual Salary ($)</Label>
+                    <Input
+                      id="salary"
+                      type="text" // Changed from number
+                      inputMode="decimal" // Added
+                      placeholder="0.00" // Added
+                      value={formData.salary}
+                      onChange={(e) => handleNumericInputChange(e, "salary")}
+                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" // Added
+                    />
+                  </div>
+                )}
+                
+                {payType === "manual" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="gross_pay">Gross Pay ($)</Label>
+                    <Input
+                      id="gross_pay"
+                      type="text" // Changed from number
+                      inputMode="decimal" // Added
+                      placeholder="0.00" // Added
+                      value={formData.gross_pay}
+                      onChange={(e) => handleNumericInputChange(e, "gross_pay")}
+                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" // Added
+                    />
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ytd_gross">YTD Gross ($)</Label>
+                    <Input
+                      id="ytd_gross"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={formData.ytd_gross}
+                      onChange={(e) => handleNumericInputChange(e, "ytd_gross")}
+                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ytd_net">YTD Net ($)</Label>
+                    <Input
+                      id="ytd_net"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={formData.ytd_net}
+                      onChange={(e) => handleNumericInputChange(e, "ytd_net")}
+                      className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <p className="text-sm text-blue-600">Calculated Gross Pay</p>
+                  <p className="text-2xl font-bold text-blue-800">${calculateGrossPay().toFixed(2)}</p>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="deductions" className="space-y-4">
+              <p className="text-sm text-gray-600">Standard taxes (Federal, State, Social Security, Medicare) will be calculated automatically. Add optional deductions below.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="health_insurance">Health Insurance ($)</Label>
+                  <Input
+                    id="health_insurance"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.deductions.health_insurance}
+                    onChange={(e) => handleNumericInputChange(e, "health_insurance", true)}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="retirement_401k">401(k) Contribution ($)</Label>
+                  <Input
+                    id="retirement_401k"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.deductions.retirement_401k}
+                    onChange={(e) => handleNumericInputChange(e, "retirement_401k", true)}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="other">Other Deductions ($)</Label>
+                  <Input
+                    id="other"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.deductions.other}
+                    onChange={(e) => handleNumericInputChange(e, "other", true)}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isGenerating}
+              className="bg-gradient-to-r from-green-600 to-emerald-600"
+            >
+              {isGenerating ? 'Generating...' : 'Generate Pay Stub'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
+import React from "react";
+import { Eye, Download, FileText, Trash2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+export default function PayStubList({ payStubs, isLoading, onViewPayStub, onDeletePayStub }) {
+  // Helper function to safely format dates
+  const formatDate = (dateValue, formatString) => {
+    if (!dateValue) return 'N/A';
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return 'N/A';
+      return format(date, formatString);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Your Pay Stubs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-gray-100 rounded-xl animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                  <div>
+                    <div className="h-4 w-40 bg-gray-200 rounded"></div>
+                    <div className="h-3 w-24 bg-gray-200 rounded mt-2"></div>
+                  </div>
+                </div>
+                <div className="h-8 w-20 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Your Pay Stubs</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {payStubs.length > 0 ? (
+          <div className="space-y-3">
+            {payStubs.map((payStub) => (
+              <div key={payStub.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">{payStub.employer_name}</p>
+                    <p className="text-sm text-gray-500">
+                      {formatDate(payStub.pay_period_start, 'MMM d')} - {formatDate(payStub.pay_period_end, 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="font-bold text-lg">${(payStub.net_pay || 0).toFixed(2)}</p>
+                    <Badge variant={payStub.status === 'generated' ? 'default' : 'secondary'}>
+                      {payStub.status}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onViewPayStub(payStub)}
+                      className="gap-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                    >
+                      <Download className="w-4 h-4" />
+                      PDF
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onDeletePayStub(payStub.id)}
+                      className="gap-1 text-red-600 hover:bg-red-50 border-red-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900">No Pay Stubs Yet</h3>
+            <p className="text-gray-500 mt-2">Generate your first pay stub to get started.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Download, Printer, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import PDFDownloadButton, { generatePayStubPDF } from "../pdf/PDFGenerator";
+
+export default function PayStubPreview({ payStub, open, onOpenChange, onDelete }) {
+  if (!payStub) return null;
+
+  const totalDeductions = Object.values(payStub.deductions || {}).reduce((sum, val) => sum + (val || 0), 0);
+
+  const formatDate = (dateValue) => {
+    if (!dateValue) return 'N/A';
+    try {
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) return 'N/A';
+      return format(date, 'MM/dd/yyyy');
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
+  };
+
+  const handlePrint = () => {
+    generatePayStubPDF(payStub);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Pay Stub Preview</DialogTitle>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" className="gap-2" onClick={handlePrint}>
+                <Printer className="w-4 h-4" />
+                Print
+              </Button>
+              <PDFDownloadButton type="paystub" data={payStub}>
+                Download PDF
+              </PDFDownloadButton>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="gap-2 text-red-600 hover:bg-red-50 border-red-600"
+                onClick={() => onDelete(payStub.id)}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+        
+        {/* Pay Stub Document */}
+        <div className="bg-white border rounded-lg p-8 space-y-6">
+          {/* Header */}
+          <div className="text-center border-b pb-4">
+            <h1 className="text-2xl font-bold text-gray-900">{payStub.employer_name}</h1>
+            <p className="text-gray-600">Employee Pay Statement</p>
+          </div>
+
+          {/* Employee & Pay Period Info */}
+          <div className="grid grid-cols-2 gap-8">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Employee Information</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Name:</span>
+                  <span className="font-medium">{payStub.employee_name}</span>
+                </div>
+                {payStub.employee_id && (
+                  <div className="flex justify-between">
+                    <span>Employee ID:</span>
+                    <span className="font-medium">{payStub.employee_id}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-3">Pay Period</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Pay Period:</span>
+                  <span className="font-medium">
+                    {formatDate(payStub.pay_period_start)} - {formatDate(payStub.pay_period_end)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pay Date:</span>
+                  <span className="font-medium">{formatDate(payStub.pay_date)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Earnings & Deductions */}
+          <div className="grid grid-cols-2 gap-8">
+            {/* Earnings */}
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-4">Earnings</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Gross Pay:</span>
+                  <span className="font-bold">${payStub.gross_pay?.toFixed(2) || '0.00'}</span>
+                </div>
+                {payStub.hourly_rate && payStub.hours_worked && (
+                  <>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Rate:</span>
+                      <span>${parseFloat(payStub.hourly_rate).toFixed(2)}/hr</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Hours:</span>
+                      <span>{parseFloat(payStub.hours_worked).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Deductions */}
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-4">Deductions</h3>
+              <div className="space-y-2 text-sm">
+                {Object.entries(payStub.deductions || {}).map(([key, value]) => {
+                  if (!value || value === 0) return null;
+                  const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  return (
+                    <div key={key} className="flex justify-between">
+                      <span>{label}:</span>
+                      <span>${parseFloat(value).toFixed(2)}</span>
+                    </div>
+                  );
+                })}
+                <div className="border-t pt-2 mt-3 flex justify-between font-semibold">
+                  <span>Total Deductions:</span>
+                  <span>${totalDeductions.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Net Pay */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-700 font-medium">Net Pay</p>
+                <p className="text-sm text-green-600">Amount deposited to your account</p>
+              </div>
+              <p className="text-3xl font-bold text-green-800">${payStub.net_pay?.toFixed(2) || '0.00'}</p>
+            </div>
+          </div>
+
+          {/* YTD Summary */}
+          <div className="border-t pt-4">
+            <h3 className="font-semibold text-gray-900 mb-3">Year-to-Date Summary</h3>
+            <div className="grid grid-cols-2 gap-8 text-sm">
+              <div className="flex justify-between">
+                <span>YTD Gross:</span>
+                <span className="font-medium">${(payStub.ytd_gross || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>YTD Net:</span>
+                <span className="font-medium">${(payStub.ytd_net || 0).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

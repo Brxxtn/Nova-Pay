@@ -1,0 +1,1604 @@
+
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle } from "lucide-react";
+
+const MAX_GIFT_CARD_BALANCE = 9998.99;
+
+export default function AddCardModal({ open, onOpenChange, onAddCard }) {
+  const [cardType, setCardType] = useState("payment");
+  const [validationErrors, setValidationErrors] = useState({}); // State for all validation errors
+
+  const [formData, setFormData] = useState({
+    card_type: "payment",
+    card_name: "",
+    card_number: "",
+    cvv: "", // New field
+    zip_code: "", // New field
+    payment_network: "visa",
+    card_variant: "physical",
+    status: "active",
+    expiry_date: "",
+    balance: 0,
+    issuer: "",
+    barcode_data: "",
+    barcode_type: "none",
+    member_id: "",
+    points_balance: 0,
+    id_number: "",
+    issue_date: "",
+    country: "",
+    color_scheme: "blue",
+    notes: ""
+  });
+
+  const validateCVV = (cvv) => {
+    const cvvRegex = /^\d{3,4}$/;
+    return cvvRegex.test(cvv);
+  };
+
+  const validateExpiryDate = (expiry) => {
+    // Format: MM/YY
+    const expiryRegex = /^(0[1-9]|1[0-2])\/\d{2}$/;
+    if (!expiryRegex.test(expiry)) return false;
+    
+    const [monthStr, yearStr] = expiry.split('/');
+    const month = parseInt(monthStr, 10);
+    const year = parseInt(yearStr, 10); // e.g., '25' for 2025
+    
+    const currentDate = new Date();
+    const currentFullYear = currentDate.getFullYear(); // e.g., 2023
+    const currentMonth = currentDate.getMonth() + 1; // getMonth() is 0-indexed
+    
+    // Convert two-digit year to four-digit year for comparison, assuming 20xx
+    const fullExpYear = 2000 + year;
+    const fullCurrentYear = currentFullYear; // Use full year for comparison
+
+    // Check if card is expired
+    if (fullExpYear < fullCurrentYear) return false;
+    if (fullExpYear === fullCurrentYear && month < currentMonth) return false;
+    
+    return true;
+  };
+
+  const validateZipCode = (zip) => {
+    // US zip code: 5 digits or 5+4 format
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    return zipRegex.test(zip);
+  };
+
+  const handleBalanceChange = (value) => {
+    const numValue = parseFloat(value);
+    
+    let balanceErrorMsg = "";
+
+    if (isNaN(numValue) || numValue < 0) { // Handle non-numeric or negative input
+        balanceErrorMsg = "Balance must be a positive number.";
+        setFormData({...formData, balance: 0}); // Set to 0 for display if invalid
+    } else if (numValue > MAX_GIFT_CARD_BALANCE) {
+        balanceErrorMsg = `Maximum balance is $${MAX_GIFT_CARD_BALANCE.toFixed(2)}`;
+        setFormData({...formData, balance: numValue}); // Store the value as typed, even if over max, for handleSubmit to catch
+    } else {
+        setFormData({...formData, balance: numValue});
+    }
+
+    setValidationErrors(prev => {
+      const newErrors = {...prev};
+      if (balanceErrorMsg) {
+        newErrors.balance = balanceErrorMsg;
+      } else {
+        delete newErrors.balance;
+      }
+      return newErrors;
+    });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    let errors = {}; // Use `let` so we can modify it
+
+    // Payment card validations
+    if (cardType === "payment") {
+      if (formData.cvv && !validateCVV(formData.cvv)) {
+        errors.cvv = "CVV must be 3 or 4 digits";
+      }
+      
+      if (formData.expiry_date && !validateExpiryDate(formData.expiry_date)) {
+        errors.expiry = "Invalid or expired date (MM/YY format)";
+      }
+      
+      if (formData.zip_code && !validateZipCode(formData.zip_code)) {
+        errors.zip = "Invalid ZIP code (5 digits or 5+4 format)";
+      }
+    }
+    
+    // Gift card balance validation
+    if (cardType === "gift") {
+      if (isNaN(formData.balance) || formData.balance < 0) {
+        errors.balance = "Balance must be a positive number.";
+      } else if (formData.balance > MAX_GIFT_CARD_BALANCE) {
+        errors.balance = `Maximum balance is $${MAX_GIFT_CARD_BALANCE.toFixed(2)}`;
+      }
+    }
+    
+    setValidationErrors(errors); // Update validationErrors state
+
+    if (Object.keys(errors).length > 0) {
+      return; // Prevent form submission if there are errors
+    }
+    
+    // Prepare final form data, including capping balance if it exceeded max
+    const finalFormData = { ...formData, card_type: cardType };
+    if (cardType === "gift") {
+      if (finalFormData.balance > MAX_GIFT_CARD_BALANCE) {
+        finalFormData.balance = MAX_GIFT_CARD_BALANCE; // Cap the value for submission if it's over
+      }
+      if (isNaN(finalFormData.balance) || finalFormData.balance < 0) {
+        finalFormData.balance = 0; // Ensure it's 0 if invalid
+      }
+    }
+
+    onAddCard(finalFormData);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setFormData({
+      card_type: "payment",
+      card_name: "",
+      card_number: "",
+      cvv: "", // Reset new field
+      zip_code: "", // Reset new field
+      payment_network: "visa",
+      card_variant: "physical",
+      status: "active",
+      expiry_date: "",
+      balance: 0,
+      issuer: "",
+      barcode_data: "",
+      barcode_type: "none",
+      member_id: "",
+      points_balance: 0,
+      id_number: "",
+      issue_date: "",
+      country: "",
+      color_scheme: "blue",
+      notes: ""
+    });
+    setValidationErrors({}); // Clear all validation errors on reset
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add New Card</DialogTitle>
+        </DialogHeader>
+        
+        <Tabs value={cardType} onValueChange={setCardType}>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="payment">Payment</TabsTrigger>
+            <TabsTrigger value="gift">Gift</TabsTrigger>
+            <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
+            <TabsTrigger value="id">ID</TabsTrigger>
+            <TabsTrigger value="passport">Passport</TabsTrigger>
+          </TabsList>
+          
+          <form onSubmit={handleSubmit}>
+            <TabsContent value="payment" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="card_name">Card Name</Label>
+                <Input
+                  id="card_name"
+                  placeholder="My Visa Card"
+                  value={formData.card_name}
+                  onChange={(e) => setFormData({...formData, card_name: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Payment Network</Label>
+                  <Select
+                    value={formData.payment_network}
+                    onValueChange={(value) => setFormData({...formData, payment_network: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="visa">Visa</SelectItem>
+                      <SelectItem value="mastercard">Mastercard</SelectItem>
+                      <SelectItem value="american_express">American Express</SelectItem>
+                      <SelectItem value="discover">Discover</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Card Type</Label>
+                  <Select
+                    value={formData.card_variant}
+                    onValueChange={(value) => setFormData({...formData, card_variant: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="physical">Physical</SelectItem>
+                      <SelectItem value="virtual">Virtual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="card_number">Card Number (Last 4 digits)</Label>
+                  <Input
+                    id="card_number"
+                    placeholder="1234"
+                    maxLength={4}
+                    value={formData.card_number}
+                    onChange={(e) => setFormData({...formData, card_number: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="expiry_date">Expiry Date (MM/YY)</Label>
+                  <Input
+                    id="expiry_date"
+                    placeholder="12/25"
+                    maxLength={5}
+                    value={formData.expiry_date}
+                    onChange={(e) => {
+                      setFormData({...formData, expiry_date: e.target.value});
+                      setValidationErrors(prev => { // Clear error on change
+                        const newErrors = {...prev};
+                        delete newErrors.expiry;
+                        return newErrors;
+                      });
+                    }}
+                  />
+                  {validationErrors.expiry && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{validationErrors.expiry}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="cvv">CVV</Label>
+                  <Input
+                    id="cvv"
+                    type="password"
+                    placeholder="123"
+                    maxLength={4}
+                    value={formData.cvv}
+                    onChange={(e) => {
+                      setFormData({...formData, cvv: e.target.value});
+                      setValidationErrors(prev => { // Clear error on change
+                        const newErrors = {...prev};
+                        delete newErrors.cvv;
+                        return newErrors;
+                      });
+                    }}
+                  />
+                  {validationErrors.cvv && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{validationErrors.cvv}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="zip_code">ZIP Code</Label>
+                  <Input
+                    id="zip_code"
+                    placeholder="12345"
+                    maxLength={10}
+                    value={formData.zip_code}
+                    onChange={(e) => {
+                      setFormData({...formData, zip_code: e.target.value});
+                      setValidationErrors(prev => { // Clear error on change
+                        const newErrors = {...prev};
+                        delete newErrors.zip;
+                        return newErrors;
+                      });
+                    }}
+                  />
+                  {validationErrors.zip && (
+                    <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{validationErrors.zip}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="gift" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="gift_name">Gift Card Name</Label>
+                <Input
+                  id="gift_name"
+                  placeholder="Amazon Gift Card"
+                  value={formData.card_name}
+                  onChange={(e) => setFormData({...formData, card_name: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="issuer">Issuer/Brand</Label>
+                  <Input
+                    id="issuer"
+                    placeholder="Amazon"
+                    value={formData.issuer}
+                    onChange={(e) => setFormData({...formData, issuer: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="balance">Balance ($)</Label>
+                  <Input
+                    id="balance"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={MAX_GIFT_CARD_BALANCE}
+                    placeholder="50.00"
+                    value={formData.balance || ""} // Shows empty string if 0 or NaN
+                    onChange={(e) => handleBalanceChange(e.target.value)}
+                    required
+                  />
+                  {validationErrors.balance && ( // Use validationErrors.balance
+                    <div className="flex items-center gap-2 text-red-600 text-sm mt-1">
+                      <AlertCircle className="w-4 h-4" />
+                      <span>{validationErrors.balance}</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Maximum balance: ${MAX_GIFT_CARD_BALANCE.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="gift_number">Card Number</Label>
+                <Input
+                  id="gift_number"
+                  placeholder="1234-5678-9012-3456"
+                  value={formData.card_number}
+                  onChange={(e) => setFormData({...formData, card_number: e.target.value})}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Color Scheme</Label>
+                <Select
+                  value={formData.color_scheme}
+                  onValueChange={(value) => setFormData({...formData, color_scheme: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="blue">Blue</SelectItem>
+                    <SelectItem value="purple">Purple</SelectItem>
+                    <SelectItem value="green">Green</SelectItem>
+                    <SelectItem value="orange">Orange</SelectItem>
+                    <SelectItem value="red">Red</SelectItem>
+                    <SelectItem value="gold">Gold</SelectItem>
+                    <SelectItem value="silver">Silver</SelectItem>
+                    <SelectItem value="black">Black</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="loyalty" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="loyalty_name">Program Name</Label>
+                <Input
+                  id="loyalty_name"
+                  placeholder="Starbucks Rewards"
+                  value={formData.card_name}
+                  onChange={(e) => setFormData({...formData, card_name: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="loyalty_issuer">Company</Label>
+                  <Input
+                    id="loyalty_issuer"
+                    placeholder="Starbucks"
+                    value={formData.issuer}
+                    onChange={(e) => setFormData({...formData, issuer: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="member_id">Member ID</Label>
+                  <Input
+                    id="member_id"
+                    placeholder="123456789"
+                    value={formData.member_id}
+                    onChange={(e) => setFormData({...formData, member_id: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="points">Points Balance</Label>
+                <Input
+                  id="points"
+                  type="number"
+                  placeholder="1250"
+                  value={formData.points_balance}
+                  onChange={(e) => setFormData({...formData, points_balance: parseInt(e.target.value) || 0})}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Barcode Type</Label>
+                  <Select
+                    value={formData.barcode_type}
+                    onValueChange={(value) => setFormData({...formData, barcode_type: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="qr">QR Code</SelectItem>
+                      <SelectItem value="code128">Barcode (Code 128)</SelectItem>
+                      <SelectItem value="ean13">Barcode (EAN-13)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Color Scheme</Label>
+                  <Select
+                    value={formData.color_scheme}
+                    onValueChange={(value) => setFormData({...formData, color_scheme: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="blue">Blue</SelectItem>
+                      <SelectItem value="purple">Purple</SelectItem>
+                      <SelectItem value="green">Green</SelectItem>
+                      <SelectItem value="orange">Orange</SelectItem>
+                      <SelectItem value="red">Red</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {formData.barcode_type !== "none" && (
+                <div className="space-y-2">
+                  <Label htmlFor="barcode_data">Barcode Data</Label>
+                  <Input
+                    id="barcode_data"
+                    placeholder="1234567890123"
+                    value={formData.barcode_data}
+                    onChange={(e) => setFormData({...formData, barcode_data: e.target.value})}
+                  />
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="id" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="id_name">ID Type</Label>
+                <Input
+                  id="id_name"
+                  placeholder="Driver's License"
+                  value={formData.card_name}
+                  onChange={(e) => setFormData({...formData, card_name: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="id_number">ID Number</Label>
+                  <Input
+                    id="id_number"
+                    placeholder="DL123456"
+                    value={formData.id_number}
+                    onChange={(e) => setFormData({...formData, id_number: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="id_country">Country/State</Label>
+                  <Input
+                    id="id_country"
+                    placeholder="California"
+                    value={formData.country}
+                    onChange={(e) => setFormData({...formData, country: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="id_issue">Issue Date</Label>
+                  <Input
+                    id="id_issue"
+                    type="date"
+                    value={formData.issue_date}
+                    onChange={(e) => setFormData({...formData, issue_date: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="id_expiry">Expiry Date</Label>
+                  <Input
+                    id="id_expiry"
+                    placeholder="12/2028"
+                    value={formData.expiry_date}
+                    onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="passport" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="passport_name">Passport Name</Label>
+                <Input
+                  id="passport_name"
+                  placeholder="US Passport"
+                  value={formData.card_name}
+                  onChange={(e) => setFormData({...formData, card_name: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="passport_number">Passport Number</Label>
+                  <Input
+                    id="passport_number"
+                    placeholder="P12345678"
+                    value={formData.id_number}
+                    onChange={(e) => setFormData({...formData, id_number: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="passport_country">Country</Label>
+                  <Input
+                    id="passport_country"
+                    placeholder="United States"
+                    value={formData.country}
+                    onChange={(e) => setFormData({...formData, country: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="passport_issue">Issue Date</Label>
+                  <Input
+                    id="passport_issue"
+                    type="date"
+                    value={formData.issue_date}
+                    onChange={(e) => setFormData({...formData, issue_date: e.target.value})}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="passport_expiry">Expiry Date</Label>
+                  <Input
+                    id="passport_expiry"
+                    type="date"
+                    value={formData.expiry_date}
+                    onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            <div className="space-y-2 mt-4">
+              <Label htmlFor="notes">Notes (Optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Additional information..."
+                value={formData.notes}
+                onChange={(e) => setFormData({...formData, notes: e.target.value})}
+              />
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <Button type="button" variant="outline" onClick={() => {
+                onOpenChange(false);
+                resetForm();
+              }}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                Add Card
+              </Button>
+            </div>
+          </form>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Copy, Settings, Trash2 } from "lucide-react";
+
+const cardGradients = {
+  visa: "from-blue-600 to-blue-800",
+  mastercard: "from-red-500 to-red-700", 
+  american_express: "from-green-600 to-green-800"
+};
+
+const cardLogos = {
+  visa: "VISA",
+  mastercard: "Mastercard",
+  american_express: "AMEX"
+};
+
+export default function CardDetails({ card, open, onOpenChange }) {
+  if (!card) return null;
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Card Details</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {/* Card Visual */}
+          <div className={`h-56 bg-gradient-to-br ${cardGradients[card.card_type]} p-6 text-white relative overflow-hidden rounded-xl`}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-10 -translate-x-10" />
+            
+            <div className="relative z-10 h-full flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                <div className="text-sm font-medium opacity-80">
+                  {card.card_variant === 'virtual' ? 'VIRTUAL' : 'PHYSICAL'}
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-bold">{cardLogos[card.card_type]}</div>
+                  <div className="text-sm opacity-80">
+                    {card.expiry_month}/{card.expiry_year}
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xl font-mono tracking-wider mb-3">
+                  •••• •••• •••• {card.card_number?.slice(-4)}
+                </div>
+                <div className="text-sm opacity-90">
+                  {card.nickname || `${card.card_type.charAt(0).toUpperCase() + card.card_type.slice(1)} Card`}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card Info */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Status</p>
+                <Badge variant={card.status === 'active' ? 'default' : card.status === 'frozen' ? 'secondary' : 'destructive'}>
+                  {card.status}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Daily Limit</p>
+                <p className="font-semibold">${card.spending_limit?.toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm text-gray-500 mb-2">Card Number</p>
+              <div className="flex items-center gap-2">
+                <code className="bg-gray-100 px-3 py-2 rounded flex-1 font-mono">
+                  •••• •••• •••• {card.card_number?.slice(-4)}
+                </code>
+                <Button size="icon" variant="outline" onClick={() => copyToClipboard(card.card_number)}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Expiry Date</p>
+                <p className="font-mono">{card.expiry_month}/{card.expiry_year}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">CVV</p>
+                <p className="font-mono">•••</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t">
+            <Button variant="outline" className="flex-1 gap-2">
+              <Settings className="w-4 h-4" />
+              Settings
+            </Button>
+            <Button variant="outline" className="flex-1 gap-2 text-red-600 hover:bg-red-50">
+              <Trash2 className="w-4 h-4" />
+              Cancel Card
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Copy, Snowflake, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+
+export default function CardDetailsModal({ card, open, onOpenChange, onDelete, onUpdate }) {
+  if (!card) return null;
+
+  const handleCopy = (text) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      // Using a simple alert since toast might not be configured
+      alert("Copied to clipboard!");
+    }).catch((err) => {
+      console.error("Failed to copy:", err);
+      alert("Failed to copy to clipboard");
+    });
+  };
+
+  const handleFreeze = async () => {
+    const newStatus = card.status === 'active' ? 'frozen' : 'active';
+    try {
+      await onUpdate(card.id, { status: newStatus });
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Error updating card status:", error);
+      alert("Failed to update card status");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this card? This action cannot be undone.')) {
+      try {
+        await onDelete(card.id);
+      } catch (error) {
+        console.error("Error deleting card:", error);
+        alert("Failed to delete card");
+      }
+    }
+  };
+
+  const renderCardDetails = () => {
+    switch (card.card_type) {
+      case "payment":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Payment Network</p>
+                <p className="font-semibold capitalize">{card.payment_network}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Card Type</p>
+                <p className="font-semibold capitalize">{card.card_variant}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-2">Card Number</p>
+              <div className="flex items-center gap-2">
+                <code className="bg-gray-100 px-3 py-2 rounded flex-1 font-mono">
+                  •••• •••• •••• {card.card_number?.slice(-4) || '****'}
+                </code>
+                {card.card_number && (
+                  <Button 
+                    size="icon" 
+                    variant="outline" 
+                    onClick={() => handleCopy(card.card_number)}
+                    type="button"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            {card.expiry_date && (
+              <div>
+                <p className="text-sm text-gray-500">Expiry Date</p>
+                <p className="font-mono">{card.expiry_date}</p>
+              </div>
+            )}
+          </div>
+        );
+        
+      case "gift":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Issuer</p>
+                <p className="font-semibold">{card.issuer}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Balance</p>
+                <p className="font-semibold text-green-600">${card.balance?.toFixed(2)}</p>
+              </div>
+            </div>
+            {card.card_number && (
+              <div>
+                <p className="text-sm text-gray-500 mb-2">Card Number</p>
+                <div className="flex items-center gap-2">
+                  <code className="bg-gray-100 px-3 py-2 rounded flex-1 font-mono">
+                    {card.card_number}
+                  </code>
+                  <Button 
+                    size="icon" 
+                    variant="outline" 
+                    onClick={() => handleCopy(card.card_number)}
+                    type="button"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+        
+      case "loyalty":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Company</p>
+                <p className="font-semibold">{card.issuer}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Points</p>
+                <p className="font-semibold text-purple-600">{card.points_balance?.toLocaleString()}</p>
+              </div>
+            </div>
+            {card.member_id && (
+              <div>
+                <p className="text-sm text-gray-500 mb-2">Member ID</p>
+                <div className="flex items-center gap-2">
+                  <code className="bg-gray-100 px-3 py-2 rounded flex-1 font-mono">
+                    {card.member_id}
+                  </code>
+                  <Button 
+                    size="icon" 
+                    variant="outline" 
+                    onClick={() => handleCopy(card.member_id)}
+                    type="button"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            {card.barcode_type !== "none" && card.barcode_data && (
+              <div className="text-center py-4 border-t">
+                <p className="text-sm text-gray-500 mb-3">Barcode/QR Code</p>
+                <div className="bg-gray-100 p-6 rounded-lg inline-block">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-48 h-48 bg-white rounded-lg flex items-center justify-center border-2 border-gray-300">
+                      <p className="text-xs text-gray-400">{card.barcode_type.toUpperCase()}</p>
+                    </div>
+                    <code className="text-sm font-mono bg-white px-4 py-2 rounded">
+                      {card.barcode_data}
+                    </code>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleCopy(card.barcode_data)}
+                      type="button"
+                    >
+                      <Copy className="w-3 h-3 mr-2" />
+                      Copy Code
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+        
+      case "id":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">ID Number</p>
+                <p className="font-mono">{card.id_number}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Issued By</p>
+                <p className="font-semibold">{card.country}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Issue Date</p>
+                <p>{card.issue_date}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Expiry</p>
+                <p>{card.expiry_date}</p>
+              </div>
+            </div>
+          </div>
+        );
+        
+      case "passport":
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Passport Number</p>
+                <p className="font-mono">{card.id_number}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Country</p>
+                <p className="font-semibold">{card.country}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Issue Date</p>
+                <p>{card.issue_date}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Expiry</p>
+                <p>{card.expiry_date}</p>
+              </div>
+            </div>
+          </div>
+        );
+        
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>{card.card_name}</span>
+            <Badge variant={card.status === 'active' ? 'default' : 'secondary'}>
+              {card.status}
+            </Badge>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {renderCardDetails()}
+          
+          {card.notes && (
+            <div>
+              <p className="text-sm text-gray-500 mb-2">Notes</p>
+              <p className="text-sm bg-gray-50 p-3 rounded">{card.notes}</p>
+            </div>
+          )}
+          
+          <div className="flex flex-col gap-3 pt-4 border-t">
+            {card.card_type === "payment" && (
+              <Button 
+                variant="outline" 
+                className={`w-full ${card.status === 'frozen' ? 'text-green-600 border-green-600' : 'text-blue-600 border-blue-600'}`}
+                onClick={handleFreeze}
+                type="button"
+              >
+                {card.status === 'active' ? (
+                  <>
+                    <Snowflake className="w-4 h-4 mr-2" />
+                    Freeze Card
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Unfreeze Card
+                  </>
+                )}
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              className="w-full text-red-600 hover:bg-red-50 border-red-600"
+              onClick={handleDelete}
+              type="button"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Card
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React from "react";
+import { CreditCard, Gift, Heart, IdCard, Plane } from "lucide-react";
+import PaymentCard from "./card-types/PaymentCard";
+import GiftCard from "./card-types/GiftCard";
+import LoyaltyCard from "./card-types/LoyaltyCard";
+import IDCard from "./card-types/IDCard";
+import PassportCard from "./card-types/PassportCard";
+
+export default function CardGrid({ cards, onCardClick }) {
+  const renderCard = (card) => {
+    switch (card.card_type) {
+      case "payment":
+        return <PaymentCard key={card.id} card={card} onClick={() => onCardClick(card)} />;
+      case "gift":
+        return <GiftCard key={card.id} card={card} onClick={() => onCardClick(card)} />;
+      case "loyalty":
+        return <LoyaltyCard key={card.id} card={card} onClick={() => onCardClick(card)} />;
+      case "id":
+        return <IDCard key={card.id} card={card} onClick={() => onCardClick(card)} />;
+      case "passport":
+        return <PassportCard key={card.id} card={card} onClick={() => onCardClick(card)} />;
+      default:
+        return null;
+    }
+  };
+
+  if (cards.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CreditCard className="w-10 h-10 text-gray-400" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">No cards yet</h3>
+        <p className="text-gray-600">Add your first card to get started</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {cards.map(card => renderCard(card))}
+    </div>
+  );
+}
+
+
+import React from "react";
+import { Eye, Snowflake, Settings, CreditCard } from "lucide-react";
+import { Card, CardContent } from "../components/ui/card"; // Assuming shadcn/ui path for Card and CardContent
+import { Button } from "../components/ui/button"; // Assuming shadcn/ui path for Button
+
+// Mock constants for cardGradients and cardLogos as they were indicated
+// as 'existing code' but not provided in the snippet for a complete file.
+// In a real application, these would likely be defined elsewhere or imported.
+const cardGradients = {
+  visa: 'from-blue-600 to-indigo-700',
+  mastercard: 'from-orange-500 to-red-600',
+  amex: 'from-teal-600 to-cyan-700',
+  default: 'from-gray-500 to-gray-700', // Fallback for unknown types
+};
+
+const cardLogos = {
+  visa: 'VISA',
+  mastercard: 'Mastercard',
+  amex: 'AMEX',
+  default: 'Card', // Fallback for unknown types
+};
+
+export default function CardItem({ card, onViewDetails, onToggleStatus }) {
+  return (
+    <Card className="bg-white border-0 shadow-xl overflow-hidden group hover:shadow-2xl transition-all duration-300">
+      {/* Card Visual */}
+      <div className={`h-48 bg-gradient-to-br ${cardGradients[card.card_type] || cardGradients.default} p-6 text-white relative overflow-hidden`}>
+        {/* Background Pattern */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
+        <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-10 -translate-x-10" />
+        
+        <div className="relative z-10 h-full flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div className="text-xs font-medium opacity-80">
+              {card.card_variant === 'virtual' ? 'VIRTUAL' : 'PHYSICAL'}
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold">{cardLogos[card.card_type] || cardLogos.default}</div>
+              <div className="text-xs opacity-80">
+                {card.expiry_month}/{card.expiry_year}
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <div className="text-lg font-mono tracking-wider mb-2">
+              •••• •••• •••• {card.card_number?.slice(-4)}
+            </div>
+            <div className="text-sm opacity-90">
+              {card.nickname || `${card.card_type.charAt(0).toUpperCase() + card.card_type.slice(1)} Card`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <CardContent className="p-6">
+        {/* This section was indicated as existing code for badge and limit */}
+        <div className="flex justify-between items-center mb-4">
+          <span className={`px-3 py-1 text-xs font-semibold rounded-full ${card.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {card.status === 'active' ? 'Active' : 'Frozen'}
+          </span>
+          <div className="text-sm font-medium text-gray-700">
+            Limit: ${card.limit}
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onViewDetails(card)}
+            className="flex-1 gap-2"
+          >
+            <Eye className="w-4 h-4" />
+            Details
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onToggleStatus(card.id, card.status === 'active' ? 'frozen' : 'active')}
+            className="gap-2"
+          >
+            <Snowflake className="w-4 h-4" />
+            {card.status === 'active' ? 'Freeze' : 'Unfreeze'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+export default function CreateCardModal({ open, onOpenChange, onCreateCard }) {
+  const [formData, setFormData] = useState({
+    card_type: 'visa',
+    card_variant: 'virtual',
+    nickname: '',
+    spending_limit: 5000
+  });
+  const [isCreating, setIsCreating] = useState(false);
+
+  const generateCardNumber = () => {
+    const lastFour = Math.floor(1000 + Math.random() * 9000);
+    return `****-****-****-${lastFour}`;
+  };
+
+  const getCurrentYear = () => new Date().getFullYear();
+  const getCurrentMonth = () => (new Date().getMonth() + 1).toString().padStart(2, '0');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsCreating(true);
+
+    try {
+      const cardData = {
+        ...formData,
+        card_number: generateCardNumber(),
+        expiry_month: getCurrentMonth(),
+        expiry_year: (getCurrentYear() + 4).toString(),
+        status: 'active'
+      };
+
+      await onCreateCard(cardData);
+      setFormData({
+        card_type: 'visa',
+        card_variant: 'virtual',
+        nickname: '',
+        spending_limit: 5000
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create New Card</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Card Type */}
+          <div className="space-y-3">
+            <Label>Card Type</Label>
+            <Select
+              value={formData.card_type}
+              onValueChange={(value) => setFormData({...formData, card_type: value})}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="visa">Visa</SelectItem>
+                <SelectItem value="mastercard">Mastercard</SelectItem>
+                <SelectItem value="american_express">American Express</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Card Variant */}
+          <div className="space-y-3">
+            <Label>Card Type</Label>
+            <RadioGroup
+              value={formData.card_variant}
+              onValueChange={(value) => setFormData({...formData, card_variant: value})}
+              className="flex gap-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="virtual" id="virtual" />
+                <Label htmlFor="virtual">Virtual Card</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="physical" id="physical" />
+                <Label htmlFor="physical">Physical Card</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Nickname */}
+          <div className="space-y-2">
+            <Label htmlFor="nickname">Card Nickname (Optional)</Label>
+            <Input
+              id="nickname"
+              placeholder="My Shopping Card"
+              value={formData.nickname}
+              onChange={(e) => setFormData({...formData, nickname: e.target.value})}
+            />
+          </div>
+
+          {/* Spending Limit */}
+          <div className="space-y-2">
+            <Label htmlFor="limit">Daily Spending Limit</Label>
+            <Input
+              id="limit"
+              type="number"
+              min="100"
+              max="25000"
+              value={formData.spending_limit}
+              onChange={(e) => setFormData({...formData, spending_limit: parseFloat(e.target.value)})}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={isCreating}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600"
+            >
+              {isCreating ? 'Creating...' : 'Create Card'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React from "react";
+import { Gift, DollarSign } from "lucide-react";
+
+const colorSchemes = {
+  blue: "from-blue-500 to-blue-700",
+  purple: "from-purple-500 to-purple-700",
+  green: "from-green-500 to-green-700",
+  orange: "from-orange-500 to-orange-700",
+  red: "from-red-500 to-red-700",
+  gold: "from-yellow-500 to-yellow-700",
+  silver: "from-gray-400 to-gray-600",
+  black: "from-gray-800 to-black"
+};
+
+export default function GiftCard({ card, onClick }) {
+  const gradient = colorSchemes[card.color_scheme] || colorSchemes.green;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="cursor-pointer group"
+    >
+      <div className={`h-48 bg-gradient-to-br ${gradient} rounded-2xl p-6 text-white relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
+        {/* Gift Icon Pattern */}
+        <div className="absolute top-4 right-4 opacity-20">
+          <Gift className="w-24 h-24" />
+        </div>
+        
+        <div className="relative z-10 h-full flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div className="text-xs font-medium opacity-80 flex items-center gap-2">
+              <Gift className="w-4 h-4" />
+              GIFT CARD
+            </div>
+            <div className="text-sm font-medium">{card.issuer}</div>
+          </div>
+          
+          <div>
+            {card.balance !== undefined && (
+              <div className="mb-3 flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                <span className="text-2xl font-bold">{card.balance.toFixed(2)}</span>
+              </div>
+            )}
+            <div className="text-lg font-semibold mb-2">{card.card_name}</div>
+            {card.card_number && (
+              <div className="text-sm font-mono opacity-90">
+                {card.card_number}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+import React from "react";
+import { IdCard as IdIcon, User } from "lucide-react";
+
+export default function IDCard({ card, onClick }) {
+  return (
+    <div 
+      onClick={onClick}
+      className="cursor-pointer group"
+    >
+      <div className="h-48 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl p-6 text-white relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+        {/* ID Icon */}
+        <div className="absolute top-4 right-4 opacity-20">
+          <IdIcon className="w-24 h-24" />
+        </div>
+        
+        <div className="relative z-10 h-full flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div className="text-xs font-medium opacity-80 flex items-center gap-2">
+              <IdIcon className="w-4 h-4" />
+              IDENTIFICATION
+            </div>
+            {card.country && (
+              <div className="text-sm font-medium">{card.country}</div>
+            )}
+          </div>
+          
+          <div>
+            <div className="text-xl font-bold mb-2">{card.card_name}</div>
+            {card.id_number && (
+              <div className="text-sm font-mono mb-1">ID: {card.id_number}</div>
+            )}
+            {card.issue_date && (
+              <div className="text-xs opacity-80">Issued: {card.issue_date}</div>
+            )}
+            {card.expiry_date && (
+              <div className="text-xs opacity-80">Expires: {card.expiry_date}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+import React from "react";
+import { Heart, Star } from "lucide-react";
+
+const colorSchemes = {
+  blue: "from-blue-500 to-blue-700",
+  purple: "from-purple-500 to-purple-700",
+  green: "from-green-500 to-green-700",
+  orange: "from-orange-500 to-orange-700",
+  red: "from-red-500 to-red-700",
+  gold: "from-yellow-500 to-yellow-700",
+  silver: "from-gray-400 to-gray-600",
+  black: "from-gray-800 to-black"
+};
+
+export default function LoyaltyCard({ card, onClick }) {
+  const gradient = colorSchemes[card.color_scheme] || colorSchemes.purple;
+
+  return (
+    <div 
+      onClick={onClick}
+      className="cursor-pointer group"
+    >
+      <div className={`h-48 bg-gradient-to-br ${gradient} rounded-2xl p-6 text-white relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
+        {/* Background Pattern */}
+        <div className="absolute top-4 right-4 opacity-20">
+          <Star className="w-24 h-24" />
+        </div>
+        
+        <div className="relative z-10 h-full flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div className="text-xs font-medium opacity-80 flex items-center gap-2">
+              <Heart className="w-4 h-4" />
+              LOYALTY MEMBER
+            </div>
+            <div className="text-sm font-medium">{card.issuer}</div>
+          </div>
+          
+          <div>
+            {card.points_balance !== undefined && (
+              <div className="mb-3">
+                <div className="text-sm opacity-80">Points Balance</div>
+                <div className="text-3xl font-bold">{card.points_balance.toLocaleString()}</div>
+              </div>
+            )}
+            <div className="text-lg font-semibold mb-1">{card.card_name}</div>
+            {card.member_id && (
+              <div className="text-sm font-mono opacity-90">
+                Member ID: {card.member_id}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+import React from "react";
+import { Plane } from "lucide-react";
+
+export default function PassportCard({ card, onClick }) {
+  return (
+    <div 
+      onClick={onClick}
+      className="cursor-pointer group"
+    >
+      <div className="h-48 bg-gradient-to-br from-red-700 to-red-900 rounded-2xl p-6 text-white relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105">
+        {/* Plane Icon */}
+        <div className="absolute top-4 right-4 opacity-20">
+          <Plane className="w-24 h-24" />
+        </div>
+        
+        <div className="relative z-10 h-full flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div className="text-xs font-medium opacity-80 flex items-center gap-2">
+              <Plane className="w-4 h-4" />
+              PASSPORT
+            </div>
+            {card.country && (
+              <div className="text-sm font-bold">{card.country}</div>
+            )}
+          </div>
+          
+          <div>
+            <div className="text-xl font-bold mb-3">{card.card_name}</div>
+            {card.id_number && (
+              <div className="text-sm font-mono mb-1">
+                Passport No: {card.id_number}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {card.issue_date && (
+                <div>
+                  <div className="opacity-70">Issued</div>
+                  <div className="font-medium">{card.issue_date}</div>
+                </div>
+              )}
+              {card.expiry_date && (
+                <div>
+                  <div className="opacity-70">Expires</div>
+                  <div className="font-medium">{card.expiry_date}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+import React from "react";
+import { CreditCard, Snowflake } from "lucide-react";
+
+const networkColors = {
+  visa: "from-blue-600 to-blue-800",
+  mastercard: "from-orange-500 to-red-600",
+  american_express: "from-green-600 to-teal-700",
+  discover: "from-orange-600 to-orange-800"
+};
+
+const networkLogos = {
+  visa: "VISA",
+  mastercard: "Mastercard",
+  american_express: "AMEX",
+  discover: "DISCOVER"
+};
+
+export default function PaymentCard({ card, onClick }) {
+  const gradient = networkColors[card.payment_network] || "from-gray-600 to-gray-800";
+
+  return (
+    <div 
+      onClick={onClick}
+      className="cursor-pointer group"
+    >
+      <div className={`h-48 bg-gradient-to-br ${gradient} rounded-2xl p-6 text-white relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105`}>
+        {/* Background Pattern */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
+        <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-10 -translate-x-10" />
+        
+        <div className="relative z-10 h-full flex flex-col justify-between">
+          <div className="flex justify-between items-start">
+            <div className="text-xs font-medium opacity-80 flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              {card.card_variant?.toUpperCase() || 'PHYSICAL'}
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-bold">{networkLogos[card.payment_network]}</div>
+              {card.status === 'frozen' && <Snowflake className="w-4 h-4 ml-auto mt-1" />}
+            </div>
+          </div>
+          
+          <div>
+            <div className="text-lg font-mono tracking-wider mb-2">
+              •••• •••• •••• {card.card_number?.slice(-4) || '••••'}
+            </div>
+            <div className="flex justify-between items-center">
+              <div className="text-sm opacity-90">{card.card_name}</div>
+              <div className="text-xs opacity-80">{card.expiry_date}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

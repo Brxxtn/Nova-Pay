@@ -1,0 +1,2390 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, TrendingUp, TrendingDown, RefreshCw, AlertCircle } from "lucide-react";
+
+export default function AITradingInsights({ cryptocurrencies, holdings, transactions }) {
+  const [insights, setInsights] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    generateInsights();
+  }, [cryptocurrencies]);
+
+  const generateInsights = async () => {
+    setLoading(true);
+    try {
+      const topCryptos = cryptocurrencies.slice(0, 8);
+      const holdingSymbols = holdings.map(h => h.crypto_symbol);
+      
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `As an AI financial analyst, analyze these cryptocurrency market trends and provide trading insights:
+
+Current Market Data:
+${topCryptos.map(c => `- ${c.name} (${c.symbol}): $${c.current_price} (${c.price_change_24h > 0 ? '+' : ''}${c.price_change_24h}%)`).join('\n')}
+
+User Holdings: ${holdingSymbols.length > 0 ? holdingSymbols.join(', ') : 'None'}
+Recent Activity: ${transactions.length} transactions
+
+Provide 5 actionable insights in this format:
+{
+  "insights": [
+    {
+      "title": "Short insight title",
+      "description": "Detailed analysis (2-3 sentences)",
+      "symbol": "BTC",
+      "action": "buy|sell|hold",
+      "confidence": "high|medium|low",
+      "reasoning": "Brief reason for recommendation"
+    }
+  ]
+}
+
+Focus on:
+1. Market momentum and trends
+2. Potential buying opportunities
+3. Risk warnings
+4. Portfolio diversification
+5. Technical indicators`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            insights: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  symbol: { type: "string" },
+                  action: { type: "string" },
+                  confidence: { type: "string" },
+                  reasoning: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setInsights(response.insights || []);
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      setInsights([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getActionColor = (action) => {
+    switch (action?.toLowerCase()) {
+      case 'buy': return 'bg-green-100 text-green-800';
+      case 'sell': return 'bg-red-100 text-red-800';
+      case 'hold': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getConfidenceBadge = (confidence) => {
+    switch (confidence?.toLowerCase()) {
+      case 'high': return 'bg-blue-600 text-white';
+      case 'medium': return 'bg-blue-400 text-white';
+      case 'low': return 'bg-blue-200 text-blue-800';
+      default: return 'bg-gray-400 text-white';
+    }
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+            AI Trading Insights
+          </CardTitle>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={generateInsights}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-3"></div>
+              <p className="text-sm text-gray-600">Analyzing market trends...</p>
+            </div>
+          </div>
+        ) : insights.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">No insights available</p>
+            <Button onClick={generateInsights} className="mt-4" size="sm">
+              Generate Insights
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {insights.map((insight, index) => (
+              <div key={index} className="p-4 rounded-lg border bg-gradient-to-r from-white to-purple-50">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-gray-900">{insight.title}</h4>
+                    <Badge className={getActionColor(insight.action)}>
+                      {insight.action?.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <Badge className={getConfidenceBadge(insight.confidence)}>
+                    {insight.confidence}
+                  </Badge>
+                </div>
+                
+                <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
+                
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium text-purple-600">{insight.symbol}</span>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-gray-600">{insight.reasoning}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-blue-800">
+              AI insights are generated based on current market data and trends. 
+              This is not financial advice. Always conduct your own research before trading.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+
+export default function CreateStrategyModal({ onClose, onSuccess }) {
+  const [formData, setFormData] = useState({
+    strategy_name: "",
+    crypto_symbol: "BTC",
+    strategy_type: "price_drop",
+    action: "buy",
+    use_ai_predictions: false,
+    max_trades_per_day: 5
+  });
+  const [buyConditions, setBuyConditions] = useState({
+    price_threshold: "",
+    amount_usd: ""
+  });
+  const [sellConditions, setSellConditions] = useState({
+    price_threshold: "",
+    take_profit_percentage: "",
+    stop_loss_percentage: "",
+    quantity: ""
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.strategy_name || !formData.crypto_symbol) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const strategyData = {
+        ...formData,
+        buy_conditions: formData.action === "buy" || formData.action === "both" ? {
+          price_threshold: buyConditions.price_threshold ? parseFloat(buyConditions.price_threshold) : undefined,
+          amount_usd: buyConditions.amount_usd ? parseFloat(buyConditions.amount_usd) : undefined
+        } : undefined,
+        sell_conditions: formData.action === "sell" || formData.action === "both" ? {
+          price_threshold: sellConditions.price_threshold ? parseFloat(sellConditions.price_threshold) : undefined,
+          take_profit_percentage: sellConditions.take_profit_percentage ? parseFloat(sellConditions.take_profit_percentage) : undefined,
+          stop_loss_percentage: sellConditions.stop_loss_percentage ? parseFloat(sellConditions.stop_loss_percentage) : undefined,
+          quantity: sellConditions.quantity ? parseFloat(sellConditions.quantity) : undefined
+        } : undefined,
+        is_active: true,
+        trades_today: 0,
+        total_executions: 0,
+        total_profit_loss: 0,
+        status: "active"
+      };
+
+      await base44.entities.TradingStrategy.create(strategyData);
+      toast.success("Trading strategy created!");
+      onSuccess();
+    } catch (error) {
+      console.error("Error creating strategy:", error);
+      toast.error("Failed to create strategy");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Trading Strategy</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div>
+            <Label>Strategy Name *</Label>
+            <Input
+              placeholder="e.g., BTC Dip Buyer"
+              value={formData.strategy_name}
+              onChange={(e) => setFormData({ ...formData, strategy_name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Cryptocurrency *</Label>
+              <Select value={formData.crypto_symbol} onValueChange={(value) => setFormData({ ...formData, crypto_symbol: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
+                  <SelectItem value="ETH">Ethereum (ETH)</SelectItem>
+                  <SelectItem value="SOL">Solana (SOL)</SelectItem>
+                  <SelectItem value="ADA">Cardano (ADA)</SelectItem>
+                  <SelectItem value="DOT">Polkadot (DOT)</SelectItem>
+                  <SelectItem value="MATIC">Polygon (MATIC)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Strategy Type</Label>
+              <Select value={formData.strategy_type} onValueChange={(value) => setFormData({ ...formData, strategy_type: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="price_drop">Price Drop</SelectItem>
+                  <SelectItem value="price_rise">Price Rise</SelectItem>
+                  <SelectItem value="dca">Dollar Cost Average</SelectItem>
+                  <SelectItem value="ai_driven">AI Driven</SelectItem>
+                  <SelectItem value="rsi">RSI Based</SelectItem>
+                  <SelectItem value="moving_average">Moving Average</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Action *</Label>
+              <Select value={formData.action} onValueChange={(value) => setFormData({ ...formData, action: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="buy">Buy Only</SelectItem>
+                  <SelectItem value="sell">Sell Only</SelectItem>
+                  <SelectItem value="both">Buy & Sell</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Max Trades Per Day</Label>
+              <Input
+                type="number"
+                value={formData.max_trades_per_day}
+                onChange={(e) => setFormData({ ...formData, max_trades_per_day: parseInt(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={formData.use_ai_predictions}
+              onCheckedChange={(checked) => setFormData({ ...formData, use_ai_predictions: checked })}
+            />
+            <Label className="cursor-pointer">Use AI predictions for trade timing</Label>
+          </div>
+
+          <Tabs defaultValue={formData.action === "sell" ? "sell" : "buy"}>
+            <TabsList className="w-full">
+              {(formData.action === "buy" || formData.action === "both") && (
+                <TabsTrigger value="buy" className="flex-1">Buy Conditions</TabsTrigger>
+              )}
+              {(formData.action === "sell" || formData.action === "both") && (
+                <TabsTrigger value="sell" className="flex-1">Sell Conditions</TabsTrigger>
+              )}
+            </TabsList>
+
+            {(formData.action === "buy" || formData.action === "both") && (
+              <TabsContent value="buy" className="space-y-4">
+                <div>
+                  <Label>Buy When Price Drops To ($)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g., 45000"
+                    value={buyConditions.price_threshold}
+                    onChange={(e) => setBuyConditions({ ...buyConditions, price_threshold: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label>Amount to Buy ($)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g., 100"
+                    value={buyConditions.amount_usd}
+                    onChange={(e) => setBuyConditions({ ...buyConditions, amount_usd: e.target.value })}
+                  />
+                </div>
+              </TabsContent>
+            )}
+
+            {(formData.action === "sell" || formData.action === "both") && (
+              <TabsContent value="sell" className="space-y-4">
+                <div>
+                  <Label>Sell When Price Rises To ($)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g., 55000"
+                    value={sellConditions.price_threshold}
+                    onChange={(e) => setSellConditions({ ...sellConditions, price_threshold: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label>Take Profit (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 10 (sell when 10% profit)"
+                    value={sellConditions.take_profit_percentage}
+                    onChange={(e) => setSellConditions({ ...sellConditions, take_profit_percentage: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label>Stop Loss (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    placeholder="e.g., 5 (sell when 5% loss)"
+                    value={sellConditions.stop_loss_percentage}
+                    onChange={(e) => setSellConditions({ ...sellConditions, stop_loss_percentage: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <Label>Quantity to Sell</Label>
+                  <Input
+                    type="number"
+                    step="0.00001"
+                    placeholder="Leave empty to sell all"
+                    value={sellConditions.quantity}
+                    onChange={(e) => setSellConditions({ ...sellConditions, quantity: e.target.value })}
+                  />
+                </div>
+              </TabsContent>
+            )}
+          </Tabs>
+
+          <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-xs text-yellow-800">
+              ⚠️ Automated strategies execute trades without manual confirmation. Ensure your conditions are correct.
+            </p>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? "Creating..." : "Create Strategy"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { TrendingUp, TrendingDown, Activity, Target, Award, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+export default function CryptoAnalytics({ holdings, transactions }) {
+  const [portfolioHistory, setPortfolioHistory] = useState([]);
+  const [metrics, setMetrics] = useState({
+    totalPL: 0,
+    totalPLPercent: 0,
+    winRate: 0,
+    avgTradeDuration: 0,
+    bestPerformer: null,
+    worstPerformer: null
+  });
+
+  useEffect(() => {
+    calculateMetrics();
+    generatePortfolioHistory();
+  }, [holdings, transactions]);
+
+  const calculateMetrics = () => {
+    if (!holdings?.length || !transactions?.length) return;
+
+    // Calculate total P/L
+    let totalPL = 0;
+    let totalInvested = 0;
+    let bestPerformer = { symbol: '', pl: -Infinity };
+    let worstPerformer = { symbol: '', pl: Infinity };
+
+    holdings.forEach(holding => {
+      const invested = holding.quantity * (holding.average_buy_price || 0);
+      const current = holding.current_value || 0;
+      const pl = current - invested;
+      const plPercent = invested > 0 ? ((pl / invested) * 100) : 0;
+
+      totalPL += pl;
+      totalInvested += invested;
+
+      if (plPercent > bestPerformer.pl) {
+        bestPerformer = { symbol: holding.crypto_symbol, pl: plPercent };
+      }
+      if (plPercent < worstPerformer.pl) {
+        worstPerformer = { symbol: holding.crypto_symbol, pl: plPercent };
+      }
+    });
+
+    const totalPLPercent = totalInvested > 0 ? ((totalPL / totalInvested) * 100) : 0;
+
+    // Calculate win rate
+    const buyTxs = transactions.filter(t => t.type === 'crypto_buy');
+    const sellTxs = transactions.filter(t => t.type === 'crypto_sell');
+    const completedTrades = Math.min(buyTxs.length, sellTxs.length);
+    
+    let wins = 0;
+    sellTxs.forEach(sell => {
+      const correspondingBuy = buyTxs.find(buy => 
+        sell.description?.includes(buy.description?.split(' ')[1])
+      );
+      if (correspondingBuy && sell.amount > correspondingBuy.amount) {
+        wins++;
+      }
+    });
+
+    const winRate = completedTrades > 0 ? (wins / completedTrades) * 100 : 0;
+
+    // Calculate average trade duration
+    const tradeDurations = sellTxs.map(sell => {
+      const correspondingBuy = buyTxs.find(buy => 
+        sell.description?.includes(buy.description?.split(' ')[1])
+      );
+      if (correspondingBuy) {
+        const buyDate = new Date(correspondingBuy.created_date);
+        const sellDate = new Date(sell.created_date);
+        return (sellDate - buyDate) / (1000 * 60 * 60 * 24); // days
+      }
+      return 0;
+    }).filter(d => d > 0);
+
+    const avgTradeDuration = tradeDurations.length > 0 
+      ? tradeDurations.reduce((a, b) => a + b, 0) / tradeDurations.length 
+      : 0;
+
+    setMetrics({
+      totalPL,
+      totalPLPercent,
+      winRate,
+      avgTradeDuration,
+      bestPerformer: bestPerformer.pl > -Infinity ? bestPerformer : null,
+      worstPerformer: worstPerformer.pl < Infinity ? worstPerformer : null
+    });
+  };
+
+  const generatePortfolioHistory = () => {
+    if (!transactions?.length) return;
+
+    // Generate portfolio value over time
+    const sortedTxs = [...transactions]
+      .filter(t => t.type === 'crypto_buy' || t.type === 'crypto_sell')
+      .sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+
+    let runningValue = 0;
+    const history = sortedTxs.map((tx, index) => {
+      if (tx.type === 'crypto_buy') {
+        runningValue += tx.amount;
+      } else if (tx.type === 'crypto_sell') {
+        runningValue += tx.amount;
+      }
+
+      return {
+        date: new Date(tx.created_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        value: runningValue,
+        type: tx.type
+      };
+    });
+
+    // Add current portfolio value
+    const currentValue = holdings?.reduce((sum, h) => sum + (h.current_value || 0), 0) || 0;
+    history.push({
+      date: 'Now',
+      value: currentValue,
+      type: 'current'
+    });
+
+    setPortfolioHistory(history);
+  };
+
+  const getAssetDistribution = () => {
+    if (!holdings?.length) return [];
+    
+    return holdings.map(h => ({
+      name: h.crypto_symbol,
+      value: h.current_value || 0
+    }));
+  };
+
+  const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1'];
+
+  return (
+    <div className="space-y-6">
+      {/* Performance Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total P/L</p>
+                <p className={`text-2xl font-bold ${metrics.totalPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ${Math.abs(metrics.totalPL).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+                <p className={`text-sm ${metrics.totalPLPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {metrics.totalPLPercent >= 0 ? '+' : ''}{metrics.totalPLPercent.toFixed(2)}%
+                </p>
+              </div>
+              {metrics.totalPL >= 0 ? (
+                <TrendingUp className="w-8 h-8 text-green-600" />
+              ) : (
+                <TrendingDown className="w-8 h-8 text-red-600" />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Win Rate</p>
+                <p className="text-2xl font-bold text-blue-600">{metrics.winRate.toFixed(1)}%</p>
+                <p className="text-sm text-gray-500">Success rate</p>
+              </div>
+              <Target className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Avg Hold Time</p>
+                <p className="text-2xl font-bold text-purple-600">{metrics.avgTradeDuration.toFixed(1)}</p>
+                <p className="text-sm text-gray-500">days</p>
+              </div>
+              <Clock className="w-8 h-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Top Performer</p>
+                {metrics.bestPerformer ? (
+                  <>
+                    <p className="text-2xl font-bold text-green-600">{metrics.bestPerformer.symbol}</p>
+                    <p className="text-sm text-green-600">+{metrics.bestPerformer.pl.toFixed(2)}%</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">No data</p>
+                )}
+              </div>
+              <Award className="w-8 h-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Portfolio Value Over Time */}
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-600" />
+            Portfolio Value Over Time
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {portfolioHistory.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={portfolioHistory}>
+                <defs>
+                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  formatter={(value) => `$${value.toLocaleString()}`}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#3b82f6" 
+                  strokeWidth={2}
+                  fillOpacity={1} 
+                  fill="url(#colorValue)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No trading history yet</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Asset Distribution */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle>Asset Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {getAssetDistribution().length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={getAssetDistribution()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {getAssetDistribution().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <p>No holdings to display</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Individual Asset P/L */}
+        <Card className="bg-white/80 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle>Individual Asset P/L</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {holdings?.map((holding) => {
+                const invested = holding.quantity * (holding.average_buy_price || 0);
+                const current = holding.current_value || 0;
+                const pl = current - invested;
+                const plPercent = invested > 0 ? ((pl / invested) * 100) : 0;
+
+                return (
+                  <div key={holding.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-gray-900">{holding.crypto_symbol}</p>
+                      <p className="text-sm text-gray-500">{holding.quantity} units</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-bold ${pl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {pl >= 0 ? '+' : ''}${pl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <Badge variant={pl >= 0 ? 'success' : 'destructive'} className="text-xs">
+                        {pl >= 0 ? '+' : ''}{plPercent.toFixed(2)}%
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+              {(!holdings || holdings.length === 0) && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No holdings to analyze</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+import React from "react";
+import { ArrowUpRight, ArrowDownRight, Bitcoin } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+export default function CryptoHistory({ transactions }) {
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bitcoin className="w-6 h-6 text-orange-600" />
+          Crypto Transactions
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {transactions.length > 0 ? (
+          <div className="space-y-4">
+            {transactions.map((transaction) => {
+              const isBuy = transaction.type === 'crypto_buy';
+              
+              return (
+                <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      isBuy ? 'bg-green-100' : 'bg-red-100'
+                    }`}>
+                      {isBuy ? 
+                        <ArrowDownRight className="w-6 h-6 text-green-600" /> :
+                        <ArrowUpRight className="w-6 h-6 text-red-600" />
+                      }
+                    </div>
+                    <div>
+                      <p className="font-medium">{transaction.description}</p>
+                      <p className="text-sm text-gray-500">
+                        {format(new Date(transaction.created_date), 'MMM d, h:mm a')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <p className={`font-bold ${
+                      isBuy ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {isBuy ? '-' : '+'}${Math.abs(transaction.amount).toFixed(2)}
+                    </p>
+                    <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'}>
+                      {transaction.status}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Bitcoin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No crypto transactions yet</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, Sparkles, Loader2, Bitcoin, AlertTriangle, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+export default function CryptoInsights({ cryptocurrencies, holdings }) {
+  const [insights, setInsights] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedCrypto, setSelectedCrypto] = useState(null);
+
+  const generateInsights = async () => {
+    setIsAnalyzing(true);
+    try {
+      const topCryptos = cryptocurrencies.slice(0, 10);
+      
+      const prompt = `As a cryptocurrency analyst, provide insights on the current crypto market and recommendations.
+
+Current Market Data:
+${topCryptos.map(c => `- ${c.name} (${c.symbol}): $${c.current_price} (24h change: ${c.price_change_24h}%)`).join('\n')}
+
+User's Holdings:
+${holdings.length > 0 ? holdings.map(h => `- ${h.crypto_symbol}: ${h.quantity} units`).join('\n') : 'No holdings yet'}
+
+Provide analysis in this JSON format:
+{
+  "market_summary": "brief overview of current market conditions",
+  "trending_cryptos": [
+    {"symbol": "BTC", "reason": "why it's noteworthy", "sentiment": "bullish/bearish/neutral"}
+  ],
+  "portfolio_advice": "specific advice for this user's portfolio",
+  "risk_level": "low/medium/high",
+  "recommended_actions": [
+    {"action": "what to consider", "priority": "high/medium/low"}
+  ]
+}
+
+Be balanced, educational, and remind users this is a demo platform.`;
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: prompt,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            market_summary: { type: "string" },
+            trending_cryptos: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  symbol: { type: "string" },
+                  reason: { type: "string" },
+                  sentiment: { type: "string" }
+                }
+              }
+            },
+            portfolio_advice: { type: "string" },
+            risk_level: { type: "string" },
+            recommended_actions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  action: { type: "string" },
+                  priority: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setInsights(response);
+    } catch (error) {
+      console.error("Error generating insights:", error);
+      alert("Failed to generate insights. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getCryptoAnalysis = async (crypto) => {
+    setIsAnalyzing(true);
+    setSelectedCrypto(crypto);
+    try {
+      const prompt = `Provide a detailed analysis of ${crypto.name} (${crypto.symbol}).
+
+Current Data:
+- Price: $${crypto.current_price}
+- 24h Change: ${crypto.price_change_24h}%
+- Market Cap: $${crypto.market_cap}
+
+Use internet context to provide:
+1. Recent news and developments
+2. Technical analysis (support/resistance levels)
+3. Buy/Sell/Hold recommendation with confidence level
+4. Price targets (short-term and long-term)
+5. Key risks and opportunities
+
+Be specific and actionable.`;
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: prompt,
+        add_context_from_internet: true
+      });
+
+      alert(response);
+      setSelectedCrypto(null);
+    } catch (error) {
+      console.error("Error getting crypto analysis:", error);
+      alert("Failed to get crypto analysis. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getSentimentColor = (sentiment) => {
+    switch (sentiment?.toLowerCase()) {
+      case 'bullish': return 'bg-green-100 text-green-800';
+      case 'bearish': return 'bg-red-100 text-red-800';
+      default: return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  const getRiskColor = (risk) => {
+    switch (risk?.toLowerCase()) {
+      case 'low': return 'bg-green-100 text-green-800';
+      case 'high': return 'bg-red-100 text-red-800';
+      default: return 'bg-yellow-100 text-yellow-800';
+    }
+  };
+
+  return (
+    <Card className="bg-gradient-to-br from-orange-50 via-yellow-50 to-amber-50 border-orange-200 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="w-6 h-6 text-orange-600" />
+          AI Crypto Market Insights
+          <Sparkles className="w-4 h-4 text-yellow-500" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!insights ? (
+          <>
+            <p className="text-sm text-gray-600">
+              Get AI-powered analysis of market trends, your portfolio, and investment opportunities.
+            </p>
+            <Button
+              onClick={generateInsights}
+              disabled={isAnalyzing}
+              className="w-full bg-gradient-to-r from-orange-600 to-yellow-600"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing Market...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Get Market Insights
+                </>
+              )}
+            </Button>
+          </>
+        ) : (
+          <div className="space-y-4">
+            {/* Market Summary */}
+            <div className="bg-white rounded-lg p-4">
+              <h3 className="font-semibold mb-2">Market Summary</h3>
+              <p className="text-sm text-gray-600">{insights.market_summary}</p>
+            </div>
+
+            {/* Trending Cryptos */}
+            <div className="bg-white rounded-lg p-4">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Bitcoin className="w-4 h-4" />
+                Trending Cryptos
+              </h3>
+              <div className="space-y-3">
+                {insights.trending_cryptos?.map((cryptoItem, idx) => (
+                  <div key={idx} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-orange-600">{cryptoItem.symbol}</span>
+                        <Badge className={getSentimentColor(cryptoItem.sentiment)} size="sm">
+                          {cryptoItem.sentiment}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-600">{cryptoItem.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Portfolio Assessment */}
+            {holdings.length > 0 && (
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="font-semibold mb-3">Portfolio Assessment</h3>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Overall Risk</p>
+                    <Badge className={getRiskColor(insights.risk_level)}>
+                      {insights.risk_level}
+                    </Badge>
+                  </div>
+                  {/* Diversification score removed as no direct equivalent in new schema */}
+                </div>
+                {insights.portfolio_advice && (
+                  <div className="mb-3">
+                    <p className="text-sm text-gray-600 italic">{insights.portfolio_advice}</p>
+                  </div>
+                )}
+                {insights.recommended_actions?.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-medium text-sm">Recommended Actions:</h4>
+                    {insights.recommended_actions.map((rec, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700">{rec.action} <Badge variant="outline" className={`ml-1 text-xs ${rec.priority === 'high' ? 'border-red-500 text-red-500' : rec.priority === 'medium' ? 'border-yellow-500 text-yellow-500' : 'border-gray-500 text-gray-500'}`}>{rec.priority}</Badge></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Market Trends section removed as no direct equivalent in new schema */}
+
+            <Button
+              onClick={() => setInsights(null)}
+              variant="outline"
+              className="w-full"
+            >
+              Get Fresh Analysis
+            </Button>
+          </div>
+        )}
+
+        {/* Quick Crypto Analysis */}
+        {!insights && cryptocurrencies.length > 0 && (
+          <div className="bg-white rounded-lg p-4">
+            <h4 className="font-semibold mb-3 text-sm">Quick Analysis</h4>
+            <div className="grid grid-cols-2 gap-2">
+              {cryptocurrencies.slice(0, 4).map((crypto) => (
+                <Button
+                  key={crypto.id}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => getCryptoAnalysis(crypto)}
+                  disabled={isAnalyzing && selectedCrypto?.id === crypto.id}
+                  className="text-xs"
+                >
+                  {isAnalyzing && selectedCrypto?.id === crypto.id ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : null}
+                  Analyze {crypto.symbol}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { TrendingUp, TrendingDown, RefreshCw, Bitcoin } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+
+export default function CryptoMarket({ cryptocurrencies, onBuy, isLoadingPrices, onRefreshPrices, onSelectChart }) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredCryptos = cryptocurrencies.filter(crypto =>
+    crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Bitcoin className="w-6 h-6" />
+            Crypto Market
+          </CardTitle>
+          <Button
+            onClick={onRefreshPrices}
+            disabled={isLoadingPrices}
+            variant="outline"
+            size="sm"
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoadingPrices ? 'animate-spin' : ''}`} />
+            {isLoadingPrices ? 'Loading...' : 'Refresh Prices'}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <Input
+            placeholder="Search cryptocurrencies..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+
+          {isLoadingPrices ? (
+            <div className="text-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">Loading real-time prices...</p>
+            </div>
+          ) : filteredCryptos.length === 0 ? (
+            <div className="text-center py-8">
+              <Bitcoin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No cryptocurrencies found</p>
+              <Button onClick={onRefreshPrices} className="mt-4" size="sm">
+                Load Market Data
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredCryptos.map((crypto) => {
+                const priceChange = crypto.price_change_24h || 0;
+                const isPositive = priceChange >= 0;
+
+                return (
+                  <div
+                    key={crypto.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-yellow-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">{crypto.symbol}</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-900">{crypto.name}</p>
+                        <p className="text-sm text-gray-500">
+                          Rank #{crypto.rank || 'N/A'} • ${(crypto.market_cap / 1e9).toFixed(2)}B
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-gray-900">
+                        ${crypto.current_price?.toFixed(2) || '0.00'}
+                      </p>
+                      <Badge className={isPositive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {isPositive ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+                        {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+                      </Badge>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        onClick={() => onSelectChart && onSelectChart(crypto)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Chart
+                      </Button>
+                      <Button
+                        onClick={() => onBuy(crypto)}
+                        size="sm"
+                        className="bg-gradient-to-r from-orange-500 to-yellow-500"
+                      >
+                        Buy
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Wallet, TrendingUp, TrendingDown } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+export default function CryptoPortfolio({ holdings, cryptocurrencies = [] }) {
+  const getCryptoDetails = (symbol) => {
+    if (!cryptocurrencies || cryptocurrencies.length === 0) return null;
+    return cryptocurrencies.find(crypto => crypto.symbol === symbol);
+  };
+
+  const totalValue = holdings.reduce((sum, holding) => sum + (holding.current_value || 0), 0);
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Wallet className="w-6 h-6 text-blue-600" />
+          My Portfolio
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {holdings.length > 0 ? (
+          <div className="space-y-4">
+            {/* Portfolio Summary */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Portfolio Value</p>
+                  <p className="text-2xl font-bold text-gray-900">${totalValue.toFixed(2)}</p>
+                </div>
+                <Badge className="bg-green-100 text-green-800">
+                  <TrendingUp className="w-3 h-3 mr-1" />
+                  +12.5%
+                </Badge>
+              </div>
+            </div>
+
+            {/* Holdings List */}
+            {holdings.map((holding) => {
+              const cryptoDetails = getCryptoDetails(holding.crypto_symbol);
+              const profitLoss = holding.current_value - (holding.average_buy_price * holding.quantity);
+              const profitLossPercent = ((holding.current_value - (holding.average_buy_price * holding.quantity)) / (holding.average_buy_price * holding.quantity)) * 100;
+              
+              return (
+                <div key={holding.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                      <span className="font-bold text-sm">{holding.crypto_symbol}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold">{cryptoDetails?.name || holding.crypto_symbol}</p>
+                      <p className="text-sm text-gray-500">
+                        {holding.quantity} {holding.crypto_symbol}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <p className="font-bold">${holding.current_value?.toFixed(2)}</p>
+                    <div className={`flex items-center gap-1 text-sm ${
+                      profitLoss >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {profitLoss >= 0 ? 
+                        <TrendingUp className="w-3 h-3" /> : 
+                        <TrendingDown className="w-3 h-3" />
+                      }
+                      <span>
+                        {profitLoss >= 0 ? '+' : ''}${profitLoss.toFixed(2)} 
+                        ({profitLossPercent.toFixed(1)}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Wallet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600 mb-4">Your portfolio is empty</p>
+            <p className="text-sm text-gray-500">Start trading to build your crypto portfolio</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+import React, { useState, useEffect } from "react";
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+
+export default function CryptoPriceChart({ symbol, name, currentPrice }) {
+  const [historicalData, setHistoricalData] = useState([]);
+  const [timeframe, setTimeframe] = useState("7d");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadHistoricalData();
+  }, [symbol, timeframe]);
+
+  const loadHistoricalData = async () => {
+    setLoading(true);
+    try {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generate realistic historical price data for ${name} (${symbol}) cryptocurrency for the past ${timeframe === '24h' ? '24 hours' : timeframe === '7d' ? '7 days' : timeframe === '30d' ? '30 days' : '90 days'}.
+
+Return ${timeframe === '24h' ? 24 : timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90} data points showing realistic price fluctuations.
+Current price is $${currentPrice}. Generate realistic historical data leading up to this price.
+
+Return format:
+{
+  "data": [
+    { "time": "2024-01-01", "price": 42000.50 },
+    ...
+  ]
+}`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  time: { type: "string" },
+                  price: { type: "number" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setHistoricalData(response.data || []);
+    } catch (error) {
+      console.error("Error loading historical data:", error);
+      // Generate fallback data
+      generateFallbackData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateFallbackData = () => {
+    const points = timeframe === '24h' ? 24 : timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
+    const data = [];
+    let price = currentPrice * 0.95;
+    
+    for (let i = 0; i < points; i++) {
+      const change = (Math.random() - 0.48) * (currentPrice * 0.03);
+      price = Math.max(price + change, currentPrice * 0.8);
+      
+      const date = new Date();
+      date.setDate(date.getDate() - (points - i - 1));
+      
+      data.push({
+        time: date.toLocaleDateString(),
+        price: parseFloat(price.toFixed(2))
+      });
+    }
+    
+    data[data.length - 1].price = currentPrice;
+    setHistoricalData(data);
+  };
+
+  const priceChange = historicalData.length > 1 
+    ? ((historicalData[historicalData.length - 1]?.price - historicalData[0]?.price) / historicalData[0]?.price) * 100 
+    : 0;
+
+  const isPositive = priceChange >= 0;
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            {symbol} Price Chart
+            {isPositive ? (
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            ) : (
+              <TrendingDown className="w-5 h-5 text-red-600" />
+            )}
+          </CardTitle>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={loadHistoricalData}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        <div className="flex items-center gap-4 mt-2">
+          <p className="text-3xl font-bold">${currentPrice?.toLocaleString()}</p>
+          <span className={`text-lg font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+            {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2 mb-4">
+          {['24h', '7d', '30d', '90d'].map(tf => (
+            <Button
+              key={tf}
+              size="sm"
+              variant={timeframe === tf ? 'default' : 'outline'}
+              onClick={() => setTimeframe(tf)}
+            >
+              {tf}
+            </Button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={historicalData}>
+              <defs>
+                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={isPositive ? "#10b981" : "#ef4444"} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={isPositive ? "#10b981" : "#ef4444"} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis 
+                dataKey="time" 
+                stroke="#6b7280"
+                tick={{ fontSize: 12 }}
+              />
+              <YAxis 
+                stroke="#6b7280"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => `$${value.toLocaleString()}`}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px'
+                }}
+                formatter={(value) => [`$${value.toLocaleString()}`, 'Price']}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="price" 
+                stroke={isPositive ? "#10b981" : "#ef4444"}
+                strokeWidth={2}
+                fillOpacity={1} 
+                fill="url(#colorPrice)" 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+export default function CryptoTrade({ crypto, open, onOpenChange, onTrade }) {
+  const [tradeData, setTradeData] = useState({
+    amount: "",
+    total: 0
+  });
+  const [isTrading, setIsTrading] = useState(false);
+
+  if (!crypto) return null;
+
+  const calculateTotal = (amount) => {
+    return amount * crypto.current_price;
+  };
+
+  const handleAmountChange = (amount) => {
+    const numAmount = parseFloat(amount) || 0;
+    setTradeData({
+      amount,
+      total: calculateTotal(numAmount)
+    });
+  };
+
+  const handleTrade = async (type) => {
+    if (!tradeData.amount) return;
+
+    setIsTrading(true);
+    try {
+      await onTrade({
+        type,
+        crypto,
+        amount: parseFloat(tradeData.amount),
+        total: tradeData.total
+      });
+      
+      setTradeData({ amount: "", total: 0 });
+    } finally {
+      setIsTrading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="text-xs font-bold">{crypto.symbol}</span>
+            </div>
+            Trade {crypto.name}
+            <Badge className="bg-red-500 text-white ml-2">DEMO</Badge>
+          </DialogTitle>
+          <p className="text-sm text-gray-600 mt-2">
+            ⚠️ Simulated trading only - not real cryptocurrency
+          </p>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {/* Price Info */}
+          <div className="bg-gray-50 p-4 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Current Price</p>
+                <p className="text-xl font-bold">${crypto.current_price?.toLocaleString()}</p>
+              </div>
+              <div className={`flex items-center gap-1 ${
+                crypto.price_change_24h >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {crypto.price_change_24h >= 0 ? 
+                  <TrendingUp className="w-4 h-4" /> : 
+                  <TrendingDown className="w-4 h-4" />
+                }
+                <span className="font-medium">
+                  {crypto.price_change_24h >= 0 ? '+' : ''}
+                  {crypto.price_change_24h?.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Tabs defaultValue="buy" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="buy" className="text-green-600">Buy</TabsTrigger>
+              <TabsTrigger value="sell" className="text-red-600">Sell</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="buy" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Amount ({crypto.symbol})</Label>
+                <Input
+                  type="number"
+                  step="0.00000001"
+                  placeholder="0.00"
+                  value={tradeData.amount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                />
+              </div>
+              
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-600">Total Cost</p>
+                <p className="text-lg font-bold text-blue-800">${tradeData.total.toFixed(2)}</p>
+              </div>
+
+              <Button
+                onClick={() => handleTrade('buy')}
+                disabled={!tradeData.amount || isTrading}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {isTrading ? 'Buying...' : `Buy ${crypto.symbol}`}
+              </Button>
+            </TabsContent>
+            
+            <TabsContent value="sell" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Amount ({crypto.symbol})</Label>
+                <Input
+                  type="number"
+                  step="0.00000001"
+                  placeholder="0.00"
+                  value={tradeData.amount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                />
+              </div>
+              
+              <div className="bg-red-50 p-3 rounded-lg">
+                <p className="text-sm text-red-600">You'll Receive</p>
+                <p className="text-lg font-bold text-red-800">${tradeData.total.toFixed(2)}</p>
+              </div>
+
+              <Button
+                onClick={() => handleTrade('sell')}
+                disabled={!tradeData.amount || isTrading}
+                className="w-full bg-red-600 hover:bg-red-700"
+              >
+                {isTrading ? 'Selling...' : `Sell ${crypto.symbol}`}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Bell, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { Badge } from "@/components/ui/badge";
+
+export default function NotificationSettings({ cryptos }) {
+  const [alerts, setAlerts] = useState([]);
+  const [portfolioAlerts, setPortfolioAlerts] = useState({
+    enabled: false,
+    threshold: 10,
+    digestEnabled: false,
+    digestFrequency: 'daily'
+  });
+  const [newAlert, setNewAlert] = useState({
+    symbol: '',
+    type: 'above',
+    price: ''
+  });
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const user = await base44.auth.me();
+      
+      // Load price alerts from user metadata
+      if (user.price_alerts) {
+        setAlerts(JSON.parse(user.price_alerts));
+      }
+      
+      // Load portfolio alert settings
+      if (user.portfolio_alerts) {
+        setPortfolioAlerts(JSON.parse(user.portfolio_alerts));
+      }
+    } catch (error) {
+      console.error('Error loading notification settings:', error);
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      await base44.auth.updateMe({
+        price_alerts: JSON.stringify(alerts),
+        portfolio_alerts: JSON.stringify(portfolioAlerts)
+      });
+    } catch (error) {
+      console.error('Error saving notification settings:', error);
+    }
+  };
+
+  const addAlert = () => {
+    if (!newAlert.symbol || !newAlert.price) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    const alert = {
+      id: Date.now(),
+      symbol: newAlert.symbol,
+      type: newAlert.type,
+      targetPrice: parseFloat(newAlert.price),
+      active: true,
+      created: new Date().toISOString()
+    };
+
+    const updatedAlerts = [...alerts, alert];
+    setAlerts(updatedAlerts);
+    setNewAlert({ symbol: '', type: 'above', price: '' });
+    
+    // Save immediately
+    base44.auth.updateMe({
+      price_alerts: JSON.stringify(updatedAlerts)
+    });
+  };
+
+  const removeAlert = (id) => {
+    const updatedAlerts = alerts.filter(a => a.id !== id);
+    setAlerts(updatedAlerts);
+    
+    base44.auth.updateMe({
+      price_alerts: JSON.stringify(updatedAlerts)
+    });
+  };
+
+  const toggleAlert = (id) => {
+    const updatedAlerts = alerts.map(a => 
+      a.id === id ? { ...a, active: !a.active } : a
+    );
+    setAlerts(updatedAlerts);
+    
+    base44.auth.updateMe({
+      price_alerts: JSON.stringify(updatedAlerts)
+    });
+  };
+
+  const updatePortfolioAlerts = (updates) => {
+    const updated = { ...portfolioAlerts, ...updates };
+    setPortfolioAlerts(updated);
+    
+    base44.auth.updateMe({
+      portfolio_alerts: JSON.stringify(updated)
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Price Alerts */}
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-blue-600" />
+            Price Alerts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add New Alert */}
+          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+            <Label>Create New Price Alert</Label>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <Select value={newAlert.symbol} onValueChange={(val) => setNewAlert({...newAlert, symbol: val})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select crypto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cryptos?.map(crypto => (
+                    <SelectItem key={crypto.symbol} value={crypto.symbol}>
+                      {crypto.symbol}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={newAlert.type} onValueChange={(val) => setNewAlert({...newAlert, type: val})}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="above">Above</SelectItem>
+                  <SelectItem value="below">Below</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Input
+                type="number"
+                placeholder="Target price"
+                value={newAlert.price}
+                onChange={(e) => setNewAlert({...newAlert, price: e.target.value})}
+              />
+
+              <Button onClick={addAlert} className="bg-blue-600">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Alert
+              </Button>
+            </div>
+          </div>
+
+          {/* Active Alerts */}
+          <div className="space-y-2">
+            {alerts.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">No price alerts set</p>
+            ) : (
+              alerts.map(alert => (
+                <div key={alert.id} className="flex items-center justify-between p-3 bg-white border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={alert.active}
+                      onCheckedChange={() => toggleAlert(alert.id)}
+                    />
+                    <div>
+                      <p className="font-semibold flex items-center gap-2">
+                        {alert.symbol}
+                        {alert.type === 'above' ? (
+                          <TrendingUp className="w-4 h-4 text-green-600" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4 text-red-600" />
+                        )}
+                        ${alert.targetPrice.toLocaleString()}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Alert when price goes {alert.type} target
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={alert.active ? 'default' : 'secondary'}>
+                      {alert.active ? 'Active' : 'Paused'}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeAlert(alert.id)}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Portfolio Alerts */}
+      <Card className="bg-white/80 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle>Portfolio Change Alerts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <Label>Enable Portfolio Alerts</Label>
+              <p className="text-sm text-gray-500">Get notified of significant portfolio changes</p>
+            </div>
+            <Switch
+              checked={portfolioAlerts.enabled}
+              onCheckedChange={(val) => updatePortfolioAlerts({ enabled: val })}
+            />
+          </div>
+
+          {portfolioAlerts.enabled && (
+            <>
+              <div className="space-y-2">
+                <Label>Alert Threshold</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    value={portfolioAlerts.threshold}
+                    onChange={(e) => updatePortfolioAlerts({ threshold: parseFloat(e.target.value) })}
+                    className="w-32"
+                  />
+                  <span className="text-sm text-gray-600">% change in 24 hours</span>
+                </div>
+                <p className="text-sm text-gray-500">
+                  You'll be alerted when your portfolio value changes by ±{portfolioAlerts.threshold}% in a day
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <Label>Notification Digest</Label>
+                  <p className="text-sm text-gray-500">Reduce alert frequency with summaries</p>
+                </div>
+                <Switch
+                  checked={portfolioAlerts.digestEnabled}
+                  onCheckedChange={(val) => updatePortfolioAlerts({ digestEnabled: val })}
+                />
+              </div>
+
+              {portfolioAlerts.digestEnabled && (
+                <div className="space-y-2">
+                  <Label>Digest Frequency</Label>
+                  <Select 
+                    value={portfolioAlerts.digestFrequency}
+                    onValueChange={(val) => updatePortfolioAlerts({ digestFrequency: val })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hourly">Every Hour</SelectItem>
+                      <SelectItem value="daily">Once Daily</SelectItem>
+                      <SelectItem value="weekly">Once Weekly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Bell, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export default function PriceAlerts({ cryptocurrencies }) {
+  const [alerts, setAlerts] = useState([]);
+  const [showDialog, setShowDialog] = useState(false);
+  const [newAlert, setNewAlert] = useState({
+    symbol: '',
+    target_price: '',
+    condition: 'above',
+    active: true
+  });
+
+  useEffect(() => {
+    loadAlerts();
+  }, []);
+
+  const loadAlerts = async () => {
+    try {
+      const user = await base44.auth.me();
+      const savedAlerts = user.price_alerts || [];
+      setAlerts(savedAlerts);
+    } catch (error) {
+      console.error("Error loading alerts:", error);
+    }
+  };
+
+  const createAlert = async () => {
+    if (!newAlert.symbol || !newAlert.target_price) {
+      alert("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const user = await base44.auth.me();
+      const crypto = cryptocurrencies.find(c => c.symbol === newAlert.symbol);
+      
+      const alertData = {
+        ...newAlert,
+        target_price: parseFloat(newAlert.target_price),
+        crypto_name: crypto?.name || newAlert.symbol,
+        current_price: crypto?.current_price || 0,
+        created_at: new Date().toISOString()
+      };
+
+      const updatedAlerts = [...alerts, alertData];
+      await base44.auth.updateMe({ price_alerts: updatedAlerts });
+      
+      setAlerts(updatedAlerts);
+      setShowDialog(false);
+      setNewAlert({ symbol: '', target_price: '', condition: 'above', active: true });
+    } catch (error) {
+      console.error("Error creating alert:", error);
+      alert("Failed to create alert");
+    }
+  };
+
+  const deleteAlert = async (index) => {
+    try {
+      const updatedAlerts = alerts.filter((_, i) => i !== index);
+      await base44.auth.updateMe({ price_alerts: updatedAlerts });
+      setAlerts(updatedAlerts);
+    } catch (error) {
+      console.error("Error deleting alert:", error);
+    }
+  };
+
+  const checkAlerts = async () => {
+    const user = await base44.auth.me();
+    const triggeredAlerts = [];
+
+    for (const alert of alerts) {
+      if (!alert.active) continue;
+
+      const crypto = cryptocurrencies.find(c => c.symbol === alert.symbol);
+      if (!crypto) continue;
+
+      const currentPrice = crypto.current_price;
+      const triggered = 
+        (alert.condition === 'above' && currentPrice >= alert.target_price) ||
+        (alert.condition === 'below' && currentPrice <= alert.target_price);
+
+      if (triggered) {
+        triggeredAlerts.push(alert);
+        
+        // Send email notification
+        await base44.integrations.Core.SendEmail({
+          to: user.email,
+          subject: `🔔 Price Alert: ${alert.symbol} ${alert.condition} $${alert.target_price}`,
+          body: `Your price alert has been triggered!\n\n${alert.crypto_name} (${alert.symbol})\nCurrent Price: $${currentPrice}\nTarget Price: $${alert.target_price}\nCondition: ${alert.condition}\n\nView your portfolio: ${window.location.origin}`
+        });
+      }
+    }
+
+    if (triggeredAlerts.length > 0) {
+      // Deactivate triggered alerts
+      const updatedAlerts = alerts.map(alert => {
+        const wasTriggered = triggeredAlerts.some(t => 
+          t.symbol === alert.symbol && t.target_price === alert.target_price
+        );
+        return wasTriggered ? { ...alert, active: false } : alert;
+      });
+      
+      await base44.auth.updateMe({ price_alerts: updatedAlerts });
+      setAlerts(updatedAlerts);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (alerts.length > 0 && cryptocurrencies.length > 0) {
+        checkAlerts();
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [alerts, cryptocurrencies]);
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5" />
+            Price Alerts
+          </CardTitle>
+          <Dialog open={showDialog} onOpenChange={setShowDialog}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                New Alert
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Price Alert</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div>
+                  <Label>Cryptocurrency</Label>
+                  <Select value={newAlert.symbol} onValueChange={(value) => setNewAlert({ ...newAlert, symbol: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select crypto" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cryptocurrencies.map(crypto => (
+                        <SelectItem key={crypto.symbol} value={crypto.symbol}>
+                          {crypto.name} ({crypto.symbol})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Condition</Label>
+                  <Select value={newAlert.condition} onValueChange={(value) => setNewAlert({ ...newAlert, condition: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="above">Price goes above</SelectItem>
+                      <SelectItem value="below">Price goes below</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Target Price</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={newAlert.target_price}
+                    onChange={(e) => setNewAlert({ ...newAlert, target_price: e.target.value })}
+                  />
+                </div>
+
+                <Button onClick={createAlert} className="w-full">
+                  Create Alert
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {alerts.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">No price alerts set</p>
+        ) : (
+          <div className="space-y-3">
+            {alerts.map((alert, index) => (
+              <div key={index} className={`p-4 rounded-lg border ${alert.active ? 'bg-white' : 'bg-gray-50 opacity-60'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {alert.condition === 'above' ? (
+                      <TrendingUp className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <TrendingDown className="w-5 h-5 text-red-600" />
+                    )}
+                    <div>
+                      <p className="font-semibold">{alert.crypto_name} ({alert.symbol})</p>
+                      <p className="text-sm text-gray-600">
+                        Alert when {alert.condition} ${alert.target_price.toLocaleString()}
+                      </p>
+                      {!alert.active && (
+                        <span className="text-xs text-yellow-600 font-medium">Triggered</span>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => deleteAlert(index)}
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Zap, Plus, Edit2, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import CreateStrategyModal from "./CreateStrategyModal";
+import { toast } from "sonner";
+
+export default function TradingStrategyManager() {
+  const [strategies, setStrategies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  useEffect(() => {
+    loadStrategies();
+  }, []);
+
+  const loadStrategies = async () => {
+    try {
+      const user = await base44.auth.me();
+      const data = await base44.entities.TradingStrategy.filter(
+        { created_by: user.email },
+        "-created_date"
+      );
+      setStrategies(data);
+    } catch (error) {
+      console.error("Error loading strategies:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleStrategy = async (strategy) => {
+    try {
+      await base44.entities.TradingStrategy.update(strategy.id, {
+        is_active: !strategy.is_active
+      });
+      
+      setStrategies(strategies.map(s => 
+        s.id === strategy.id ? { ...s, is_active: !s.is_active } : s
+      ));
+      
+      toast.success(`Strategy ${!strategy.is_active ? 'activated' : 'paused'}`);
+    } catch (error) {
+      console.error("Error toggling strategy:", error);
+      toast.error("Failed to update strategy");
+    }
+  };
+
+  const deleteStrategy = async (strategyId) => {
+    if (!confirm("Are you sure you want to delete this strategy?")) return;
+    
+    try {
+      await base44.entities.TradingStrategy.delete(strategyId);
+      setStrategies(strategies.filter(s => s.id !== strategyId));
+      toast.success("Strategy deleted");
+    } catch (error) {
+      console.error("Error deleting strategy:", error);
+      toast.error("Failed to delete strategy");
+    }
+  };
+
+  const getActionIcon = (action) => {
+    switch (action) {
+      case "buy": return <TrendingUp className="w-4 h-4 text-green-600" />;
+      case "sell": return <TrendingDown className="w-4 h-4 text-red-600" />;
+      default: return <Zap className="w-4 h-4 text-blue-600" />;
+    }
+  };
+
+  return (
+    <>
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-6 h-6 text-blue-600" />
+              Automated Trading Strategies
+            </CardTitle>
+            <Button onClick={() => setShowCreateModal(true)} size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              New Strategy
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : strategies.length === 0 ? (
+            <div className="text-center py-8">
+              <Zap className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 mb-4">No trading strategies yet</p>
+              <Button onClick={() => setShowCreateModal(true)} size="sm">
+                Create Your First Strategy
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {strategies.map((strategy) => (
+                <div
+                  key={strategy.id}
+                  className={`p-4 rounded-lg border ${
+                    strategy.is_active
+                      ? "bg-gradient-to-r from-white to-green-50 border-green-200"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {getActionIcon(strategy.action)}
+                        <h4 className="font-semibold text-gray-900">{strategy.strategy_name}</h4>
+                        <Badge variant={strategy.is_active ? "default" : "outline"}>
+                          {strategy.is_active ? "Active" : "Paused"}
+                        </Badge>
+                        {strategy.use_ai_predictions && (
+                          <Badge className="bg-purple-600">AI-Powered</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span className="font-semibold">{strategy.crypto_symbol}</span>
+                        <span>•</span>
+                        <span className="capitalize">{strategy.action}</span>
+                        <span>•</span>
+                        <span className="capitalize">{strategy.strategy_type.replace('_', ' ')}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={strategy.is_active ? "outline" : "default"}
+                        onClick={() => toggleStrategy(strategy)}
+                      >
+                        {strategy.is_active ? "Pause" : "Activate"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => deleteStrategy(strategy.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="p-2 bg-white rounded">
+                      <p className="text-xs text-gray-500">Executions</p>
+                      <p className="font-semibold">{strategy.total_executions || 0}</p>
+                    </div>
+                    <div className="p-2 bg-white rounded">
+                      <p className="text-xs text-gray-500">Today</p>
+                      <p className="font-semibold">
+                        {strategy.trades_today || 0}/{strategy.max_trades_per_day}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-white rounded">
+                      <p className="text-xs text-gray-500">P/L</p>
+                      <p className={`font-semibold ${
+                        (strategy.total_profit_loss || 0) >= 0 ? "text-green-600" : "text-red-600"
+                      }`}>
+                        ${(strategy.total_profit_loss || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-white rounded">
+                      <p className="text-xs text-gray-500">Last Run</p>
+                      <p className="font-semibold text-xs">
+                        {strategy.last_executed
+                          ? new Date(strategy.last_executed).toLocaleDateString()
+                          : "Never"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Conditions */}
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-900 mb-2">Conditions:</p>
+                    <div className="space-y-1 text-xs text-blue-800">
+                      {strategy.buy_conditions && (
+                        <div>
+                          <span className="font-semibold">Buy:</span>{" "}
+                          {strategy.buy_conditions.price_threshold && 
+                            `Price ≤ $${strategy.buy_conditions.price_threshold}`}
+                          {strategy.buy_conditions.amount_usd && 
+                            ` • Amount: $${strategy.buy_conditions.amount_usd}`}
+                        </div>
+                      )}
+                      {strategy.sell_conditions && (
+                        <div>
+                          <span className="font-semibold">Sell:</span>{" "}
+                          {strategy.sell_conditions.price_threshold && 
+                            `Price ≥ $${strategy.sell_conditions.price_threshold}`}
+                          {strategy.sell_conditions.take_profit_percentage && 
+                            ` • Take Profit: ${strategy.sell_conditions.take_profit_percentage}%`}
+                          {strategy.sell_conditions.stop_loss_percentage && 
+                            ` • Stop Loss: ${strategy.sell_conditions.stop_loss_percentage}%`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-xs text-yellow-800">
+              <Zap className="w-4 h-4 inline mr-1" />
+              Automated strategies run every 5 minutes. Ensure you have sufficient balance and holdings for execution.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {showCreateModal && (
+        <CreateStrategyModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            loadStrategies();
+            setShowCreateModal(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+
+

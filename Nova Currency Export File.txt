@@ -1,0 +1,326 @@
+
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Download, FileText, FileSpreadsheet, FileJson, Loader2, Calendar } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+
+export default function ExportManager({ transactions, account, cards, cryptoHoldings, user }) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [timeRange, setTimeRange] = useState("30");
+
+  const getFilteredTransactions = () => {
+    const days = parseInt(timeRange);
+    if (days === 0) return transactions;
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    return transactions.filter(t => {
+      const txDate = new Date(t.created_date);
+      return txDate >= cutoffDate;
+    });
+  };
+
+  const exportToCSV = () => {
+    setIsExporting(true);
+    const filtered = getFilteredTransactions();
+    
+    const csvContent = [
+      ['Date', 'Description', 'Amount', 'Type', 'Category', 'Merchant', 'Status'],
+      ...filtered.map(t => [
+        new Date(t.created_date).toLocaleDateString(),
+        `"${t.description}"`,
+        t.amount,
+        t.type,
+        t.category || '',
+        `"${t.merchant || ''}"`,
+        t.status
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    downloadFile(csvContent, 'text/csv', `transactions_${getDateString()}.csv`);
+    setIsExporting(false);
+  };
+
+  const exportToJSON = () => {
+    setIsExporting(true);
+    const filtered = getFilteredTransactions();
+    const jsonContent = JSON.stringify(filtered, null, 2);
+    downloadFile(jsonContent, 'application/json', `transactions_${getDateString()}.json`);
+    setIsExporting(false);
+  };
+
+  const exportFinancialReport = () => {
+    setIsExporting(true);
+    const filtered = getFilteredTransactions();
+    
+    const totalIncome = filtered
+      .filter(t => ['credit', 'transfer_in'].includes(t.type))
+      .reduce((sum, t) => sum + t.amount, 0);
+    
+    const totalExpenses = filtered
+      .filter(t => ['debit', 'transfer_out'].includes(t.type))
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+    const categoryBreakdown = {};
+    filtered.forEach(t => {
+      if (['debit', 'transfer_out'].includes(t.type)) {
+        const cat = t.category || 'other';
+        categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + Math.abs(t.amount);
+      }
+    });
+
+    const report = `
+CASHFLOW FINANCIAL REPORT
+Generated: ${new Date().toLocaleString()}
+Period: Last ${timeRange} days
+User: ${user?.full_name || 'User'}
+Account: ${account?.account_number || 'N/A'}
+
+=====================================================
+
+SUMMARY
+=====================================================
+Current Balance:        $${(account?.balance || 0).toFixed(2)}
+Total Income:           $${totalIncome.toFixed(2)}
+Total Expenses:         $${totalExpenses.toFixed(2)}
+Net Cash Flow:          $${(totalIncome - totalExpenses).toFixed(2)}
+Transaction Count:      ${filtered.length}
+Savings Rate:           ${totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome * 100).toFixed(1) : 0}%
+
+=====================================================
+
+SPENDING BY CATEGORY
+=====================================================
+${Object.entries(categoryBreakdown)
+  .sort((a, b) => b[1] - a[1])
+  .map(([cat, amount]) => `${cat.padEnd(20)} $${amount.toFixed(2)}`)
+  .join('\n')}
+
+=====================================================
+
+CARDS & ASSETS
+=====================================================
+Payment Cards:          ${cards.filter(c => c.card_type === 'payment').length}
+Gift Cards:             ${cards.filter(c => c.card_type === 'gift').length}
+Loyalty Cards:          ${cards.filter(c => c.card_type === 'loyalty').length}
+Crypto Holdings:        ${cryptoHoldings.length}
+Total Crypto Value:     $${cryptoHoldings.reduce((sum, h) => sum + (h.current_value || 0), 0).toFixed(2)}
+
+=====================================================
+
+RECENT TRANSACTIONS (Last 10)
+=====================================================
+${ filtered.slice(0, 10).map(t => 
+  `${new Date(t.created_date).toLocaleDateString().padEnd(12)} ${t.description.substring(0, 30).padEnd(32)} $${t.amount.toFixed(2)}`
+).join('\n')}
+
+=====================================================
+End of Report
+    `.trim();
+
+    downloadFile(report, 'text/plain', `financial_report_${getDateString()}.txt`);
+    setIsExporting(false);
+  };
+
+  const exportAllData = () => {
+    setIsExporting(true);
+    const filtered = getFilteredTransactions();
+    
+    const allData = {
+      generated_at: new Date().toISOString(),
+      user: {
+        name: user?.full_name,
+        email: user?.email
+      },
+      account: account,
+      transactions: filtered,
+      cards: cards,
+      crypto_holdings: cryptoHoldings,
+      summary: {
+        total_transactions: filtered.length,
+        total_income: filtered
+          .filter(t => ['credit', 'transfer_in'].includes(t.type))
+          .reduce((sum, t) => sum + t.amount, 0),
+        total_expenses: filtered
+          .filter(t => ['debit', 'transfer_out'].includes(t.type))
+          .reduce((sum, t) => sum + Math.abs(t.amount), 0),
+        current_balance: account?.balance || 0
+      }
+    };
+
+    const jsonContent = JSON.stringify(allData, null, 2);
+    downloadFile(jsonContent, 'application/json', `cashflow_complete_export_${getDateString()}.json`);
+    setIsExporting(false);
+  };
+
+  const downloadFile = (content, mimeType, filename) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const getDateString = () => {
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const filtered = getFilteredTransactions();
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200 shadow-xl">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Download className="w-6 h-6 text-indigo-600" />
+              Export Your Data
+            </CardTitle>
+            <Badge className="bg-indigo-600">
+              {filtered.length} transactions
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Time Range Selector */}
+          <div className="bg-white rounded-lg p-4">
+            <Label className="text-sm font-medium mb-2 block">Select Time Range</Label>
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-full">
+                <Calendar className="w-4 h-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 Days</SelectItem>
+                <SelectItem value="30">Last 30 Days</SelectItem>
+                <SelectItem value="90">Last 3 Months</SelectItem>
+                <SelectItem value="180">Last 6 Months</SelectItem>
+                <SelectItem value="365">Last Year</SelectItem>
+                <SelectItem value="0">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Export Options */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CSV Export */}
+            <Card className="bg-white hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">CSV Export</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Export transactions to spreadsheet format
+                    </p>
+                    <Button 
+                      size="sm" 
+                      onClick={exportToCSV}
+                      disabled={isExporting}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Export CSV'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* JSON Export */}
+            <Card className="bg-white hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileJson className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">JSON Export</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Developer-friendly format
+                    </p>
+                    <Button 
+                      size="sm" 
+                      onClick={exportToJSON}
+                      disabled={isExporting}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Export JSON'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Financial Report */}
+            <Card className="bg-white hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">Financial Report</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Detailed summary with insights
+                    </p>
+                    <Button 
+                      size="sm" 
+                      onClick={exportFinancialReport}
+                      disabled={isExporting}
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                    >
+                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Export Report'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Complete Export */}
+            <Card className="bg-white hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Download className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold mb-1">Complete Export</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      All data including cards & crypto
+                    </p>
+                    <Button 
+                      size="sm" 
+                      onClick={exportAllData}
+                      disabled={isExporting}
+                      className="w-full bg-orange-600 hover:bg-orange-700"
+                    >
+                      {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Export All'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Info */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Privacy Note:</strong> Your exported data contains sensitive information. 
+              Keep these files secure and never share them with untrusted parties.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

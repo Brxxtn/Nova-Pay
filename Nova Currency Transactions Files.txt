@@ -1,0 +1,1157 @@
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, X, Save, Filter } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+export default function AdvancedSearch({ 
+  onSearch, 
+  savedFilters = [], 
+  onSaveFilter, 
+  onLoadFilter 
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [filterName, setFilterName] = useState("");
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  
+  const [searchParams, setSearchParams] = useState({
+    searchTerm: "",
+    type: "all",
+    category: "all",
+    status: "all",
+    minAmount: "",
+    maxAmount: "",
+    dateFrom: null,
+    dateTo: null,
+    merchant: ""
+  });
+
+  const handleSearchChange = (key, value) => {
+    const updated = { ...searchParams, [key]: value };
+    setSearchParams(updated);
+  };
+
+  const handleSearch = () => {
+    onSearch(searchParams);
+  };
+
+  const handleClear = () => {
+    const cleared = {
+      searchTerm: "",
+      type: "all",
+      category: "all",
+      status: "all",
+      minAmount: "",
+      maxAmount: "",
+      dateFrom: null,
+      dateTo: null,
+      merchant: ""
+    };
+    setSearchParams(cleared);
+    onSearch(cleared);
+  };
+
+  const handleSaveFilter = () => {
+    if (filterName.trim()) {
+      onSaveFilter({
+        name: filterName,
+        filters: searchParams,
+        createdAt: new Date().toISOString()
+      });
+      setFilterName("");
+      setShowSaveDialog(false);
+    }
+  };
+
+  const handleLoadSavedFilter = (savedFilter) => {
+    setSearchParams(savedFilter.filters);
+    onLoadFilter(savedFilter);
+  };
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Advanced Search & Filters
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      
+      {isExpanded && (
+        <CardContent className="space-y-6">
+          {/* Basic Search */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Search Term</Label>
+              <Input
+                placeholder="Search description, merchant, amount..."
+                value={searchParams.searchTerm}
+                onChange={(e) => handleSearchChange('searchTerm', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <Label>Merchant</Label>
+              <Input
+                placeholder="Filter by merchant..."
+                value={searchParams.merchant}
+                onChange={(e) => handleSearchChange('merchant', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Filters Row */}
+          <div className="grid md:grid-cols-4 gap-4">
+            <div>
+              <Label>Type</Label>
+              <Select
+                value={searchParams.type}
+                onValueChange={(value) => handleSearchChange('type', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="debit">Debit</SelectItem>
+                  <SelectItem value="credit">Credit</SelectItem>
+                  <SelectItem value="crypto_buy">Crypto Buy</SelectItem>
+                  <SelectItem value="crypto_sell">Crypto Sell</SelectItem>
+                  <SelectItem value="transfer_in">Transfer In</SelectItem>
+                  <SelectItem value="transfer_out">Transfer Out</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Category</Label>
+              <Select
+                value={searchParams.category}
+                onValueChange={(value) => handleSearchChange('category', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="food">Food</SelectItem>
+                  <SelectItem value="shopping">Shopping</SelectItem>
+                  <SelectItem value="gas">Gas</SelectItem>
+                  <SelectItem value="entertainment">Entertainment</SelectItem>
+                  <SelectItem value="bills">Bills</SelectItem>
+                  <SelectItem value="crypto">Crypto</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={searchParams.status}
+                onValueChange={(value) => handleSearchChange('status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Amount Range */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Min Amount</Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={searchParams.minAmount}
+                onChange={(e) => handleSearchChange('minAmount', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Max Amount</Label>
+              <Input
+                type="number"
+                placeholder="10000.00"
+                value={searchParams.maxAmount}
+                onChange={(e) => handleSearchChange('maxAmount', e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Date Range */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>From Date</Label>
+              <Input
+                type="date"
+                value={searchParams.dateFrom ? new Date(searchParams.dateFrom).toISOString().split('T')[0] : ''}
+                onChange={(e) => handleSearchChange('dateFrom', e.target.value ? new Date(e.target.value) : null)}
+              />
+            </div>
+            <div>
+              <Label>To Date</Label>
+              <Input
+                type="date"
+                value={searchParams.dateTo ? new Date(searchParams.dateTo).toISOString().split('T')[0] : ''}
+                onChange={(e) => handleSearchChange('dateTo', e.target.value ? new Date(e.target.value) : null)}
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
+            <Button onClick={handleSearch} className="bg-blue-600 gap-2">
+              <Search className="w-4 h-4" />
+              Search
+            </Button>
+            <Button onClick={handleClear} variant="outline" className="gap-2">
+              <X className="w-4 h-4" />
+              Clear
+            </Button>
+            <Button 
+              onClick={() => setShowSaveDialog(!showSaveDialog)} 
+              variant="outline" 
+              className="gap-2"
+            >
+              <Save className="w-4 h-4" />
+              Save Filter
+            </Button>
+          </div>
+
+          {/* Save Filter Dialog */}
+          {showSaveDialog && (
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <Label>Filter Name</Label>
+              <div className="flex gap-2 mt-2">
+                <Input
+                  placeholder="e.g., Large Purchases"
+                  value={filterName}
+                  onChange={(e) => setFilterName(e.target.value)}
+                />
+                <Button onClick={handleSaveFilter} size="sm">
+                  Save
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Saved Filters */}
+          {savedFilters.length > 0 && (
+            <div>
+              <Label className="mb-3 block">Saved Filters</Label>
+              <div className="flex flex-wrap gap-2">
+                {savedFilters.map((filter, idx) => (
+                  <Badge
+                    key={idx}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-blue-100"
+                    onClick={() => handleLoadSavedFilter(filter)}
+                  >
+                    {filter.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Upload, Loader2, CheckCircle2, FileText } from "lucide-react";
+
+export default function ImportBankStatement({ onImportComplete }) {
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState(null);
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportStatus(null);
+
+    try {
+      // Upload file first
+      const uploadResult = await base44.integrations.Core.UploadFile({ file: file });
+      
+      if (!uploadResult.file_url) {
+        throw new Error("Failed to upload file. No file URL received.");
+      }
+
+      // Define the expected schema for transactions
+      const transactionSchema = {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            date: { type: "string" },
+            description: { type: "string" },
+            amount: { type: "number" },
+            type: { type: "string" },
+            merchant: { type: "string" },
+            category: { type: "string" }
+          },
+          required: ["date", "description", "amount"]
+        }
+      };
+
+      // Extract data from the uploaded file
+      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
+        file_url: uploadResult.file_url,
+        json_schema: transactionSchema
+      });
+
+      if (extractResult.status === 'error') {
+        throw new Error(extractResult.details || 'Failed to extract data from file. Please check its content.');
+      }
+
+      const transactions = extractResult.output;
+      
+      if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        throw new Error('No transactions found in the file or extracted in an unexpected format.');
+      }
+
+      // Create transactions in bulk
+      const createdTransactions = [];
+      for (const txn of transactions) {
+        try {
+          const created = await base44.entities.Transaction.create({
+            date: txn.date ? new Date(txn.date) : new Date(),
+            description: txn.description || "Imported transaction",
+            amount: parseFloat(txn.amount) || 0,
+            type: txn.type || 'debit',
+            merchant: txn.merchant || '',
+            category: txn.category || 'other',
+            status: 'completed',
+            reference_id: `IMP${Date.now()}${Math.random().toString(36).substr(2, 9)}`
+          });
+          createdTransactions.push(created);
+        } catch (err) {
+          console.error("Error creating transaction:", err);
+        }
+      }
+
+      setImportStatus({
+        success: true,
+        count: createdTransactions.length,
+        message: `Successfully imported ${createdTransactions.length} transactions!`
+      });
+
+      if (createdTransactions.length > 0 && onImportComplete) {
+        onImportComplete();
+      }
+
+    } catch (error) {
+      console.error("Error importing bank statement:", error);
+      setImportStatus({
+        success: false,
+        message: error.message || "Failed to import bank statement. Please check the file format and try again."
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  return (
+    <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="w-5 h-5 text-blue-600" />
+          Import Statement
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Upload your bank statement (CSV or PDF) to automatically import transactions.
+        </p>
+
+        {importStatus && (
+          <div className={`p-4 rounded-lg ${
+            importStatus.success 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              {importStatus.success ? (
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              ) : (
+                <FileText className="w-5 h-5 text-red-600" />
+              )}
+              <p className={`text-sm font-medium ${
+                importStatus.success ? 'text-green-800' : 'text-red-800'
+              }`}>
+                {importStatus.message}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="relative">
+          <input
+            type="file"
+            accept=".csv,.pdf"
+            onChange={handleFileUpload}
+            disabled={isImporting}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+          <Button
+            disabled={isImporting}
+            className="w-full bg-gradient-to-r from-blue-600 to-cyan-600"
+          >
+            {isImporting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Bank Statement
+              </>
+            )}
+          </Button>
+        </div>
+
+        <p className="text-xs text-gray-500 text-center">
+          Supports CSV and PDF formats
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Camera, Loader2, CheckCircle2 } from "lucide-react";
+import { Transaction } from "@/entities/all";
+
+export default function ReceiptScanner({ onTransactionCreated }) {
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsScanning(true);
+    setScanResult(null); // Clear any previous scan results or errors
+
+    try {
+      // Upload the receipt image
+      const uploadResult = await base44.integrations.Core.UploadFile({ file: file });
+
+      if (!uploadResult.file_url) {
+        throw new Error("Failed to upload file. Please try again.");
+      }
+
+      // Define schema for receipt data (updated as per outline with added 'required' and item properties)
+      const receiptSchema = {
+        type: "object",
+        properties: {
+          merchant: { type: "string" },
+          date: { type: "string" },
+          total: { type: "number" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                description: { type: "string" }, // Changed from 'name'
+                quantity: { type: "number" },    // Added
+                price: { type: "number" }
+              }
+            }
+          },
+          category: { type: "string" } // Retained from original schema
+        },
+        required: ["merchant", "total"] // Added as per outline
+      };
+
+      // Extract data from receipt
+      const extractResult = await base44.integrations.Core.ExtractDataFromUploadedFile({
+        file_url: uploadResult.file_url,
+        json_schema: receiptSchema
+      });
+
+      if (extractResult.status === 'error') {
+        throw new Error(extractResult.details || 'Failed to read receipt data from the image.');
+      }
+
+      // Assuming success if status is not 'error' and output exists
+      if (extractResult.output) {
+        const receipt = extractResult.output;
+
+        // Create transaction from receipt
+        const transaction = await Transaction.create({
+          description: `Purchase at ${receipt.merchant || 'Unknown Merchant'}`,
+          amount: -Math.abs(receipt.total || 0),
+          type: 'debit',
+          merchant: receipt.merchant || 'Unknown',
+          category: receipt.category || 'other', // Use extracted category or default to 'other'
+          status: 'completed',
+          reference_id: `RCP${Date.now()}`
+        });
+
+        setScanResult({
+          success: true,
+          merchant: receipt.merchant,
+          amount: receipt.total,
+          message: "Receipt scanned successfully and transaction created!"
+        });
+
+        onTransactionCreated();
+      } else {
+        throw new Error("Failed to extract meaningful data from the receipt.");
+      }
+    } catch (error) {
+      console.error("Error scanning receipt:", error);
+      setScanResult({
+        success: false,
+        message: error.message || "Failed to scan receipt. Please try again with a clearer image."
+      });
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  return (
+    <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Camera className="w-5 h-5 text-green-600" />
+          Receipt Scanner
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-gray-600">
+          Take a photo or upload an image of your receipt to automatically create a transaction.
+        </p>
+
+        {scanResult && (
+          <div className={`p-4 rounded-lg ${
+            scanResult.success 
+              ? 'bg-green-50 border border-green-200' 
+              : 'bg-red-50 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className={`w-5 h-5 ${
+                scanResult.success ? 'text-green-600' : 'text-red-600'
+              }`} />
+              <div>
+                <p className={`text-sm font-medium ${
+                  scanResult.success ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {scanResult.message}
+                </p>
+                {scanResult.success && (
+                  <p className="text-xs text-green-700 mt-1">
+                    {scanResult.merchant} • ${scanResult.amount?.toFixed(2)}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="relative">
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleImageUpload}
+            disabled={isScanning}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+          <Button
+            disabled={isScanning}
+            className="w-full bg-gradient-to-r from-green-600 to-emerald-600"
+          >
+            {isScanning ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Scanning...
+              </>
+            ) : (
+              <>
+                <Camera className="w-4 h-4 mr-2" />
+                Scan Receipt
+              </>
+            )}
+          </Button>
+        </div>
+
+        <p className="text-xs text-gray-500 text-center">
+          Supports JPG, PNG, and PDF formats
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sparkles, Loader2, CheckCircle2, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+export default function SmartCategorization({ transactions, onCategorized }) {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+
+  const analyzeTransactions = async () => {
+    setIsAnalyzing(true);
+    try {
+      // Get uncategorized or "other" category transactions
+      const needsCategorization = transactions.filter(
+        t => !t.category || t.category === 'other'
+      );
+
+      if (needsCategorization.length === 0) {
+        alert("All transactions are already categorized!");
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // Prepare transaction data for AI according to the new prompt structure
+      const transactionsForPrompt = needsCategorization.slice(0, 20).map(t =>
+        `- "${t.description}" (${t.merchant || 'no merchant'}) - $${t.amount}`
+      ).join('\n');
+
+      const prompt = `You are a financial transaction categorization expert. Analyze these transactions and categorize them appropriately.
+
+Available categories: food, shopping, gas, entertainment, bills, crypto, transfer, other
+
+Transactions to categorize:
+${transactionsForPrompt}
+
+Return JSON array with format:
+[
+  {"index": 0, "category": "food", "confidence": 0.95},
+  {"index": 1, "category": "shopping", "confidence": 0.87}
+]
+
+Be conservative - use "other" if not confident.`;
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: prompt,
+        response_json_schema: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              index: { type: "number" },
+              category: { type: "string" },
+              confidence: { type: "number" }
+            },
+            required: ["index", "category", "confidence"] // Ensure these fields are present
+          }
+        }
+      });
+
+      // Transform the AI response to the existing suggestions format
+      const newSuggestions = response.map(item => {
+        const originalTransaction = needsCategorization[item.index];
+        if (!originalTransaction) {
+          console.warn(`Transaction at index ${item.index} not found in original uncategorized list.`);
+          return null; // Skip if original transaction not found
+        }
+
+        // Map numeric confidence to string confidence for UI display
+        let confidenceString = 'low';
+        if (item.confidence >= 0.8) {
+          confidenceString = 'high';
+        } else if (item.confidence >= 0.5) {
+          confidenceString = 'medium';
+        }
+
+        return {
+          id: originalTransaction.id,
+          category: item.category,
+          confidence: confidenceString,
+          reason: "" // The new prompt does not generate a 'reason'
+        };
+      }).filter(Boolean); // Filter out any nulls
+
+      setSuggestions(newSuggestions);
+    } catch (error) {
+      console.error("Error analyzing transactions:", error);
+      alert("Failed to analyze transactions. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const applySuggestion = async (suggestion) => {
+    try {
+      await onCategorized(suggestion.id, suggestion.category);
+      setSuggestions(prev => prev.filter(s => s.id !== suggestion.id));
+    } catch (error) {
+      console.error("Error applying suggestion:", error);
+      alert("Failed to apply category. Please try again.");
+    }
+  };
+
+  const dismissSuggestion = (suggestionId) => {
+    setSuggestions(prev => prev.filter(s => s.id !== suggestionId));
+  };
+
+  const applyAllSuggestions = async () => {
+    setIsAnalyzing(true);
+    try {
+      for (const suggestion of suggestions) {
+        await onCategorized(suggestion.id, suggestion.category);
+      }
+      setSuggestions([]);
+      alert("All suggestions applied successfully!");
+    } catch (error) {
+      console.error("Error applying all suggestions:", error);
+      alert("Failed to apply some suggestions. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const getConfidenceColor = (confidence) => {
+    switch (confidence?.toLowerCase()) {
+      case 'high': return 'bg-green-100 text-green-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  return (
+    <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-600" />
+          AI Categorization
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {suggestions.length === 0 ? (
+          <>
+            <p className="text-sm text-gray-600">
+              Let AI automatically categorize your transactions based on merchant names and descriptions.
+            </p>
+            <Button
+              onClick={analyzeTransactions}
+              disabled={isAnalyzing}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Analyze Transactions
+                </>
+              )}
+            </Button>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">
+                {suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''}
+              </p>
+              <Button
+                size="sm"
+                onClick={applyAllSuggestions}
+                disabled={isAnalyzing}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isAnalyzing ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                )}
+                Apply All
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {suggestions.map((suggestion) => {
+                const transaction = transactions.find(t => t.id === suggestion.id);
+                if (!transaction) return null;
+
+                return (
+                  <div key={suggestion.id} className="bg-white p-3 rounded-lg shadow-sm">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{transaction.description}</p>
+                        {transaction.merchant && (
+                          <p className="text-xs text-gray-500">{transaction.merchant}</p>
+                        )}
+                      </div>
+                      <Badge className={getConfidenceColor(suggestion.confidence)}>
+                        {suggestion.confidence}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Badge variant="outline" className="capitalize">
+                          {suggestion.category}
+                        </Badge>
+                        {suggestion.reason && ( // Only display reason if it exists
+                          <p className="text-xs text-gray-600 mt-1">{suggestion.reason}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => dismissSuggestion(suggestion.id)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => applySuggestion(suggestion)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Search, Filter, Calendar as CalendarIcon, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export default function TransactionFilters({ onFilterChange }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [type, setType] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+
+  useEffect(() => {
+    const filters = {
+      searchTerm,
+      type,
+      dateRange: {
+        from: dateFrom ? new Date(dateFrom) : null,
+        to: dateTo ? new Date(dateTo) : null,
+      },
+      minAmount,
+      maxAmount,
+    };
+    onFilterChange(filters);
+  }, [searchTerm, type, dateFrom, dateTo, minAmount, maxAmount, onFilterChange]);
+
+  return (
+    <div className="space-y-4 mb-6 p-4 bg-gray-50 rounded-2xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Input
+            placeholder="Search by description..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Type */}
+        <Select value={type} onValueChange={setType}>
+          <SelectTrigger>
+            <SelectValue placeholder="Transaction Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="card_spend">Card Spend</SelectItem>
+            <SelectItem value="income">Income</SelectItem>
+            <SelectItem value="transfer">Transfers</SelectItem>
+            <SelectItem value="crypto">Crypto</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Amount Range */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              type="number"
+              placeholder="Min"
+              value={minAmount}
+              onChange={(e) => setMinAmount(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <div className="relative flex-1">
+            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              type="number"
+              placeholder="Max"
+              value={maxAmount}
+              onChange={(e) => setMaxAmount(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Date Range */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="relative">
+          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            type="date"
+            placeholder="From Date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="relative">
+          <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            type="date"
+            placeholder="To Date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Clear Filters Button */}
+      {(searchTerm || type !== "all" || dateFrom || dateTo || minAmount || maxAmount) && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSearchTerm("");
+              setType("all");
+              setDateFrom("");
+              setDateTo("");
+              setMinAmount("");
+              setMaxAmount("");
+            }}
+          >
+            Clear Filters
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+import React from "react";
+import { ArrowUpRight, ArrowDownRight, History, Bitcoin, ShoppingBag, Car, Coffee, Send } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+const getCategoryIcon = (category, type) => {
+  if (type === 'transfer_in' || type === 'transfer_out') return Send;
+  switch (category) {
+    case 'crypto': return Bitcoin;
+    case 'shopping': return ShoppingBag;
+    case 'gas': return Car;
+    case 'food': return Coffee;
+    default: return type.includes('in') || type === 'credit' ? ArrowDownRight : ArrowUpRight;
+  }
+};
+
+export default function TransactionList({ transactions, isLoading, onUpdate }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="flex items-center justify-between p-4 bg-gray-100 rounded-xl animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+              <div>
+                <div className="h-4 w-40 bg-gray-200 rounded"></div>
+                <div className="h-3 w-24 bg-gray-200 rounded mt-2"></div>
+              </div>
+            </div>
+            <div className="h-6 w-20 bg-gray-200 rounded"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (transactions.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <History className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900">No Transactions Found</h3>
+        <p className="text-gray-500 mt-2">Try adjusting your filters or making a new transaction.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {transactions.map((transaction) => {
+        const isCredit = ['credit', 'transfer_in'].includes(transaction.type);
+        const CategoryIcon = getCategoryIcon(transaction.category, transaction.type);
+
+        return (
+          <div key={transaction.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                isCredit ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+                <CategoryIcon className={`w-6 h-6 ${
+                  isCredit ? 'text-green-600' : 'text-red-600'
+                }`} />
+              </div>
+              <div>
+                <p className="font-medium text-gray-900">{transaction.description}</p>
+                <p className="text-sm text-gray-500">
+                  {transaction.merchant && `${transaction.merchant} • `}
+                  {format(new Date(transaction.created_date), 'MMM d, yyyy • h:mm a')}
+                  {transaction.category && ` • ${transaction.category}`}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className={`font-bold text-lg ${
+                isCredit ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {isCredit ? '+' : '-'}${Math.abs(transaction.amount).toFixed(2)}
+              </p>
+              <Badge variant={transaction.status === 'completed' ? 'default' : 'secondary'} className="capitalize mt-1">
+                {transaction.status}
+              </Badge>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+import React from "react";
+import { ArrowUpRight, ArrowDownRight, DollarSign, History } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+
+const StatCard = ({ icon: Icon, title, value, colorClass, trend }) => (
+  <Card className={`bg-white/80 backdrop-blur-sm border-0 shadow-xl overflow-hidden`}>
+    <CardContent className="p-6">
+      <div className="flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClass}`}>
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          {trend && (
+            <p className="text-xs text-gray-500 mt-1">{trend}</p>
+          )}
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+export default function TransactionStats({ transactions }) {
+  const totalIncome = transactions
+    .filter(t => ['credit', 'transfer_in'].includes(t.type))
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    
+  const totalExpenses = transactions
+    .filter(t => !['credit', 'transfer_in'].includes(t.type))
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const netFlow = totalIncome - totalExpenses;
+  
+  const avgTransaction = transactions.length > 0
+    ? totalExpenses / transactions.filter(t => !['credit', 'transfer_in'].includes(t.type)).length
+    : 0;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StatCard 
+        icon={ArrowDownRight}
+        title="Total Income"
+        value={`$${totalIncome.toFixed(2)}`}
+        colorClass="bg-green-500"
+        trend="Money received"
+      />
+      <StatCard 
+        icon={ArrowUpRight}
+        title="Total Expenses"
+        value={`$${totalExpenses.toFixed(2)}`}
+        colorClass="bg-red-500"
+        trend="Money spent"
+      />
+      <StatCard 
+        icon={DollarSign}
+        title="Net Flow"
+        value={`${netFlow >= 0 ? '+' : ''}$${netFlow.toFixed(2)}`}
+        colorClass={netFlow >= 0 ? "bg-blue-500" : "bg-orange-500"}
+        trend={netFlow >= 0 ? "Positive cash flow" : "Negative cash flow"}
+      />
+      <StatCard 
+        icon={History}
+        title="Transactions"
+        value={transactions.length}
+        colorClass="bg-purple-500"
+        trend={`Avg: $${avgTransaction.toFixed(2)}`}
+      />
+    </div>
+  );
+}
+
+
+
+
+
+
+

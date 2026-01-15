@@ -1,0 +1,354 @@
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { History, ArrowDownRight, CheckCircle2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+export default function NFCHistory({ transactions }) {
+  if (transactions.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <History className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No NFC Payments Yet</h3>
+          <p className="text-gray-600">Your contactless payment history will appear here</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="w-5 h-5" />
+          Recent NFC Payments
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {transactions.slice(0, 10).map((transaction) => (
+            <div
+              key={transaction.id}
+              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <ArrowDownRight className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900">{transaction.merchant || 'Merchant'}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(transaction.created_date).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-bold text-gray-900">-${transaction.amount.toFixed(2)}</p>
+                <Badge className="bg-green-100 text-green-800 text-xs mt-1">
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  Completed
+                </Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Radio, Loader2, CheckCircle2, Smartphone } from 'lucide-react';
+
+export default function NFCReader({ enabled, onPayment, isReading, setIsReading }) {
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [merchant, setMerchant] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState(null);
+
+  const startDigitalPayment = async () => {
+    if (!enabled) {
+      alert('Digital payments not supported on this device');
+      return;
+    }
+
+    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    setIsReading(true);
+    setPaymentStatus('reading');
+
+    try {
+      const paymentMethods = [
+        {
+          supportedMethods: 'https://google.com/pay',
+          data: {
+            environment: 'TEST',
+            apiVersion: 2,
+            apiVersionMinor: 0,
+            merchantInfo: {
+              merchantName: 'CashFlow',
+              merchantId: '12345678901234567890'
+            },
+            allowedPaymentMethods: [{
+              type: 'CARD',
+              parameters: {
+                allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+                allowedCardNetworks: ['MASTERCARD', 'VISA', 'AMEX', 'DISCOVER']
+              },
+              tokenizationSpecification: {
+                type: 'PAYMENT_GATEWAY',
+                parameters: {
+                  gateway: 'example',
+                  gatewayMerchantId: 'exampleGatewayMerchantId'
+                }
+              }
+            }]
+          }
+        },
+        {
+          supportedMethods: 'https://apple.com/apple-pay',
+          data: {
+            version: 3,
+            merchantIdentifier: 'merchant.com.cashflow',
+            merchantCapabilities: ['supports3DS'],
+            supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+            countryCode: 'US'
+          }
+        },
+        {
+          supportedMethods: 'basic-card',
+          data: {
+            supportedNetworks: ['visa', 'mastercard', 'amex', 'discover']
+          }
+        }
+      ];
+
+      const paymentDetails = {
+        total: {
+          label: merchant || 'Payment',
+          amount: {
+            currency: 'USD',
+            value: parseFloat(paymentAmount).toFixed(2)
+          }
+        },
+        displayItems: [{
+          label: merchant || 'Purchase',
+          amount: {
+            currency: 'USD',
+            value: parseFloat(paymentAmount).toFixed(2)
+          }
+        }]
+      };
+
+      const request = new PaymentRequest(paymentMethods, paymentDetails);
+
+      // Show payment UI (Google Pay / Apple Pay)
+      const paymentResponse = await request.show();
+
+      // Process payment through our backend
+      const result = await onPayment({
+        amount: parseFloat(paymentAmount),
+        merchant: merchant || 'Merchant',
+        category: 'shopping',
+        paymentMethod: paymentResponse.methodName
+      });
+
+      if (result.success) {
+        await paymentResponse.complete('success');
+        setPaymentStatus('success');
+        setTimeout(() => {
+          setPaymentAmount('');
+          setMerchant('');
+          setPaymentStatus(null);
+        }, 3000);
+      } else {
+        await paymentResponse.complete('fail');
+        setPaymentStatus('error');
+        setTimeout(() => setPaymentStatus(null), 3000);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      if (error.name !== 'AbortError') {
+        setPaymentStatus('error');
+        setTimeout(() => setPaymentStatus(null), 3000);
+      } else {
+        setPaymentStatus(null);
+      }
+    } finally {
+      setIsReading(false);
+    }
+  };
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm shadow-xl">
+      <CardContent className="p-8">
+        {paymentStatus === 'success' ? (
+          <div className="text-center space-y-4 py-8">
+            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-green-900">Payment Successful!</h3>
+            <p className="text-gray-600">${parseFloat(paymentAmount).toFixed(2)} charged</p>
+          </div>
+        ) : paymentStatus === 'error' ? (
+          <div className="text-center space-y-4 py-8">
+            <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center mx-auto">
+              <Radio className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-red-900">Payment Failed</h3>
+            <p className="text-gray-600">Please try again</p>
+          </div>
+        ) : (
+          <>
+            <div className="text-center mb-8">
+              <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center transition-all ${
+                isReading 
+                  ? 'bg-blue-500 animate-pulse' 
+                  : 'bg-gradient-to-br from-blue-100 to-indigo-100'
+              }`}>
+                {isReading ? (
+                  <Loader2 className="w-16 h-16 text-white animate-spin" />
+                ) : (
+                  <Smartphone className="w-16 h-16 text-blue-600" />
+                )}
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mt-6">
+                {isReading ? 'Complete Payment' : 'Ready to Pay'}
+              </h2>
+              <p className="text-gray-600 mt-2">
+                {isReading ? 'Follow the prompts on your device...' : 'Pay with Google Pay or Apple Pay'}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Payment Amount</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  disabled={isReading}
+                  className="text-2xl font-bold text-center"
+                />
+              </div>
+
+              <div>
+                <Label>Merchant (Optional)</Label>
+                <Input
+                  placeholder="e.g., Coffee Shop"
+                  value={merchant}
+                  onChange={(e) => setMerchant(e.target.value)}
+                  disabled={isReading}
+                />
+              </div>
+
+              <Button
+                onClick={startDigitalPayment}
+                disabled={!enabled || isReading || !paymentAmount}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 h-14 text-lg"
+              >
+                {isReading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Radio className="w-5 h-5 mr-2" />
+                    Pay Now
+                  </>
+                )}
+              </Button>
+              
+              <p className="text-xs text-center text-gray-500 mt-2">
+                Supports Google Pay, Apple Pay, and credit cards
+              </p>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Settings, CreditCard, CheckCircle2 } from 'lucide-react';
+
+export default function NFCSettings({ cards, defaultCard, onCardChange }) {
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Settings className="w-5 h-5" />
+          Payment Settings
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <p className="text-sm font-medium text-gray-700 mb-3">Default Payment Card</p>
+          {cards.length === 0 ? (
+            <p className="text-sm text-gray-500">No payment cards available</p>
+          ) : (
+            <div className="space-y-2">
+              {cards.map((card) => (
+                <button
+                  key={card.id}
+                  onClick={() => onCardChange(card)}
+                  className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                    defaultCard?.id === card.id
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="w-4 h-4 text-gray-600" />
+                      <div>
+                        <p className="font-medium text-sm">{card.card_name}</p>
+                        {card.card_number && (
+                          <p className="text-xs text-gray-500">•••• {card.card_number.slice(-4)}</p>
+                        )}
+                      </div>
+                    </div>
+                    {defaultCard?.id === card.id && (
+                      <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="pt-4 border-t">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Daily Limit</span>
+              <span className="text-sm font-semibold">$1,000</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Transaction Limit</span>
+              <span className="text-sm font-semibold">$500</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">Security</span>
+              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                Biometric On
+              </span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

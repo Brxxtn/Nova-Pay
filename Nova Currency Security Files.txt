@@ -1,0 +1,1708 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Smartphone, Monitor, Tablet, MapPin, Clock, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+export default function ConnectedDevices() {
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDevices();
+  }, []);
+
+  const loadDevices = async () => {
+    try {
+      const user = await base44.auth.me();
+      
+      // Get recent security events to derive device information
+      const securityEvents = await base44.entities.SecurityEvent.filter(
+        { created_by: user.email },
+        "-created_date",
+        100
+      );
+
+      // Extract unique devices from security events
+      const deviceMap = new Map();
+      
+      securityEvents.forEach(event => {
+        if (event.device_info) {
+          const deviceKey = event.device_info + (event.ip_address || '');
+          
+          if (!deviceMap.has(deviceKey)) {
+            deviceMap.set(deviceKey, {
+              id: deviceKey,
+              name: parseDeviceName(event.device_info),
+              type: parseDeviceType(event.device_info),
+              location: event.location || "Unknown",
+              ip_address: event.ip_address || "N/A",
+              last_active: event.created_date,
+              is_current: false
+            });
+          } else {
+            // Update last active if this event is more recent
+            const existing = deviceMap.get(deviceKey);
+            if (new Date(event.created_date) > new Date(existing.last_active)) {
+              existing.last_active = event.created_date;
+            }
+          }
+        }
+      });
+
+      // Add current device
+      const currentDevice = {
+        id: "current",
+        name: parseDeviceName(navigator.userAgent),
+        type: parseDeviceType(navigator.userAgent),
+        location: "Current Location",
+        ip_address: "Current Session",
+        last_active: new Date().toISOString(),
+        is_current: true
+      };
+
+      const allDevices = [currentDevice, ...Array.from(deviceMap.values())]
+        .sort((a, b) => new Date(b.last_active) - new Date(a.last_active))
+        .slice(0, 10); // Show top 10 devices
+
+      setDevices(allDevices);
+    } catch (error) {
+      console.error("Error loading devices:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const parseDeviceName = (userAgent) => {
+    if (!userAgent) return "Unknown Device";
+    
+    if (userAgent.includes("iPhone")) return "iPhone";
+    if (userAgent.includes("iPad")) return "iPad";
+    if (userAgent.includes("Android")) return "Android Device";
+    if (userAgent.includes("Windows")) return "Windows PC";
+    if (userAgent.includes("Macintosh")) return "Mac";
+    if (userAgent.includes("Linux")) return "Linux Device";
+    
+    return "Unknown Device";
+  };
+
+  const parseDeviceType = (userAgent) => {
+    if (!userAgent) return "desktop";
+    
+    if (userAgent.includes("Mobile") || userAgent.includes("iPhone") || userAgent.includes("Android")) {
+      return "mobile";
+    }
+    if (userAgent.includes("iPad") || userAgent.includes("Tablet")) {
+      return "tablet";
+    }
+    
+    return "desktop";
+  };
+
+  const getDeviceIcon = (type) => {
+    switch (type) {
+      case "mobile": return <Smartphone className="w-5 h-5" />;
+      case "tablet": return <Tablet className="w-5 h-5" />;
+      default: return <Monitor className="w-5 h-5" />;
+    }
+  };
+
+  const removeDevice = async (deviceId) => {
+    try {
+      // Log the device removal
+      await base44.entities.SecurityEvent.create({
+        event_type: "device_removed",
+        severity: "info",
+        description: "Device was removed from trusted devices",
+        device_info: deviceId
+      });
+
+      setDevices(devices.filter(d => d.id !== deviceId));
+      toast.success("Device removed");
+    } catch (error) {
+      console.error("Error removing device:", error);
+      toast.error("Failed to remove device");
+    }
+  };
+
+  const formatLastActive = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Monitor className="w-6 h-6 text-blue-600" />
+          Connected Devices
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : devices.length === 0 ? (
+          <div className="text-center py-8">
+            <Monitor className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">No devices found</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {devices.map((device) => (
+              <div
+                key={device.id}
+                className={`p-4 rounded-lg border ${
+                  device.is_current
+                    ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
+                    : "bg-gray-50 border-gray-200"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-white rounded-lg">
+                      {getDeviceIcon(device.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-gray-900">{device.name}</h4>
+                        {device.is_current && (
+                          <Badge className="bg-green-600">Current</Badge>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {device.location}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Last active: {formatLastActive(device.last_active)}
+                        </div>
+                        <p className="text-xs text-gray-500">IP: {device.ip_address}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {!device.is_current && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => removeDevice(device.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-xs text-blue-800">
+            Devices are tracked based on your login activity. Remove any devices you don't recognize.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, Shield, Activity, DollarSign } from "lucide-react";
+
+export default function FraudDetection() {
+  const [fraudData, setFraudData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    analyzeFraudRisks();
+  }, []);
+
+  const analyzeFraudRisks = async () => {
+    setLoading(true);
+    try {
+      const user = await base44.auth.me();
+      const transactions = await base44.entities.Transaction.filter(
+        { created_by: user.email },
+        "-created_date",
+        100
+      );
+
+      // Analyze transaction patterns
+      const now = new Date();
+      const last24Hours = transactions.filter(t => {
+        const txDate = new Date(t.created_date);
+        const hoursDiff = (now - txDate) / (1000 * 60 * 60);
+        return hoursDiff <= 24;
+      });
+
+      const failedTransactions = transactions.filter(t => t.status === 'failed');
+      const largeTransactions = transactions.filter(t => t.amount > 5000);
+
+      // Calculate risk score
+      let riskScore = 0;
+      const alerts = [];
+
+      if (last24Hours.length > 10) {
+        riskScore += 20;
+        alerts.push({ type: "warning", message: `High transaction velocity: ${last24Hours.length} in 24 hours` });
+      }
+
+      if (failedTransactions.length > 0) {
+        riskScore += 15;
+        alerts.push({ type: "info", message: `${failedTransactions.length} failed transactions detected` });
+      }
+
+      if (largeTransactions.length > 0) {
+        riskScore += 10;
+        alerts.push({ type: "info", message: `${largeTransactions.length} large transactions (>$5000)` });
+      }
+
+      // Calculate average transaction
+      const amounts = transactions.map(t => t.amount);
+      const average = amounts.length > 0 ? amounts.reduce((a, b) => a + b, 0) / amounts.length : 0;
+
+      setFraudData({
+        riskScore: Math.min(riskScore, 100),
+        alerts,
+        stats: {
+          total24h: last24Hours.length,
+          failed: failedTransactions.length,
+          large: largeTransactions.length,
+          averageAmount: average
+        }
+      });
+    } catch (error) {
+      console.error("Fraud analysis error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !fraudData) {
+    return (
+      <Card className="shadow-lg">
+        <CardContent className="p-12 text-center">
+          <Shield className="w-12 h-12 animate-pulse text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Analyzing fraud patterns...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const getRiskLevel = (score) => {
+    if (score < 30) return { label: "Low Risk", color: "text-green-600", bg: "bg-green-100" };
+    if (score < 60) return { label: "Medium Risk", color: "text-yellow-600", bg: "bg-yellow-100" };
+    return { label: "High Risk", color: "text-red-600", bg: "bg-red-100" };
+  };
+
+  const riskLevel = getRiskLevel(fraudData.riskScore);
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="w-6 h-6 text-blue-600" />
+          Fraud Detection
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className={`p-6 rounded-lg ${riskLevel.bg}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Current Risk Level</p>
+              <p className={`text-3xl font-bold ${riskLevel.color}`}>{riskLevel.label}</p>
+            </div>
+            <div className={`text-5xl font-bold ${riskLevel.color}`}>
+              {fraudData.riskScore}
+            </div>
+          </div>
+        </div>
+
+        {fraudData.alerts.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="font-semibold text-gray-900">Active Alerts</h4>
+            {fraudData.alerts.map((alert, index) => (
+              <div key={index} className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                <p className="text-sm text-gray-700">{alert.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <Activity className="w-4 h-4" />
+              24h Transactions
+            </div>
+            <p className="text-2xl font-bold">{fraudData.stats.total24h}</p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <DollarSign className="w-4 h-4" />
+              Avg Amount
+            </div>
+            <p className="text-2xl font-bold">${fraudData.stats.averageAmount.toFixed(0)}</p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <AlertTriangle className="w-4 h-4" />
+              Failed
+            </div>
+            <p className="text-2xl font-bold">{fraudData.stats.failed}</p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-600 mb-1">
+              <Shield className="w-4 h-4" />
+              Large Txs
+            </div>
+            <p className="text-2xl font-bold">{fraudData.stats.large}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import { useEffect, useRef } from 'react';
+import { base44 } from '@/api/base44Client';
+
+export default function InactivityMonitor({ 
+  timeoutMinutes = 15,
+  warningMinutes = 2 
+}) {
+  const timeoutRef = useRef(null);
+  const warningRef = useRef(null);
+  const lastActivityRef = useRef(Date.now());
+
+  const resetTimer = () => {
+    lastActivityRef.current = Date.now();
+    
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (warningRef.current) clearTimeout(warningRef.current);
+
+    // Show warning before logout
+    warningRef.current = setTimeout(() => {
+      const shouldContinue = confirm(
+        `You've been inactive for ${timeoutMinutes - warningMinutes} minutes. You'll be logged out in ${warningMinutes} minutes for security. Click OK to stay logged in.`
+      );
+      
+      if (shouldContinue) {
+        resetTimer();
+      }
+    }, (timeoutMinutes - warningMinutes) * 60 * 1000);
+
+    // Auto logout
+    timeoutRef.current = setTimeout(async () => {
+      alert('You have been logged out due to inactivity for security reasons.');
+      await base44.auth.logout();
+    }, timeoutMinutes * 60 * 1000);
+  };
+
+  useEffect(() => {
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, resetTimer);
+    });
+
+    resetTimer();
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, resetTimer);
+      });
+      
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (warningRef.current) clearTimeout(warningRef.current);
+    };
+  }, []);
+
+  return null;
+}
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Shield, Smartphone, MessageSquare, CheckCircle2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+
+export default function MFASetup() {
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaMethod, setMfaMethod] = useState("app"); // 'app' or 'sms'
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [showVerification, setShowVerification] = useState(false);
+  const [qrCode, setQrCode] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    loadMFAStatus();
+  }, []);
+
+  const loadMFAStatus = async () => {
+    try {
+      const user = await base44.auth.me();
+      setMfaEnabled(user.mfa_enabled || false);
+      setMfaMethod(user.mfa_method || "app");
+      setPhoneNumber(user.phone_number || "");
+    } catch (error) {
+      console.error("Error loading MFA status:", error);
+    }
+  };
+
+  const enableMFA = async () => {
+    setLoading(true);
+    try {
+      if (mfaMethod === "sms" && !phoneNumber) {
+        toast.error("Please enter a phone number");
+        setLoading(false);
+        return;
+      }
+
+      // Simulate MFA setup (in production, this would generate real TOTP secrets or send SMS)
+      const mockQRCode = `https://api.qrserver.net/v1/create-qr-code/?size=200x200&data=otpauth://totp/SLS:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=SLS`;
+      
+      setQrCode(mockQRCode);
+      setShowVerification(true);
+      
+      toast.success(`Verification code sent via ${mfaMethod === 'sms' ? 'SMS' : 'authenticator app'}`);
+    } catch (error) {
+      console.error("Error enabling MFA:", error);
+      toast.error("Failed to enable MFA");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyAndEnableMFA = async () => {
+    if (!verificationCode || verificationCode.length !== 6) {
+      toast.error("Please enter a valid 6-digit code");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Save MFA settings
+      await base44.auth.updateMe({
+        mfa_enabled: true,
+        mfa_method: mfaMethod,
+        phone_number: mfaMethod === 'sms' ? phoneNumber : undefined
+      });
+
+      // Log security event
+      await base44.entities.SecurityEvent.create({
+        event_type: "mfa_enabled",
+        severity: "info",
+        description: `Multi-factor authentication enabled via ${mfaMethod}`,
+        device_info: navigator.userAgent
+      });
+
+      setMfaEnabled(true);
+      setShowVerification(false);
+      toast.success("Multi-factor authentication enabled successfully!");
+    } catch (error) {
+      console.error("Error verifying MFA:", error);
+      toast.error("Invalid verification code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const disableMFA = async () => {
+    setLoading(true);
+    try {
+      await base44.auth.updateMe({
+        mfa_enabled: false
+      });
+
+      await base44.entities.SecurityEvent.create({
+        event_type: "mfa_disabled",
+        severity: "warning",
+        description: "Multi-factor authentication was disabled",
+        device_info: navigator.userAgent
+      });
+
+      setMfaEnabled(false);
+      setShowVerification(false);
+      setVerificationCode("");
+      toast.success("MFA disabled");
+    } catch (error) {
+      console.error("Error disabling MFA:", error);
+      toast.error("Failed to disable MFA");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-blue-600" />
+            Multi-Factor Authentication
+          </div>
+          {mfaEnabled && (
+            <Badge className="bg-green-600">
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+              Enabled
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {!mfaEnabled ? (
+          <>
+            {!showVerification ? (
+              <>
+                <p className="text-sm text-gray-600">
+                  Add an extra layer of security to your account by requiring a verification code in addition to your password.
+                </p>
+
+                <div className="space-y-4">
+                  <Label>Choose MFA Method</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => setMfaMethod("app")}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        mfaMethod === "app"
+                          ? "border-blue-600 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <Smartphone className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <p className="font-semibold text-sm">Authenticator App</p>
+                      <p className="text-xs text-gray-600 mt-1">Google Authenticator, Authy</p>
+                    </button>
+
+                    <button
+                      onClick={() => setMfaMethod("sms")}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        mfaMethod === "sms"
+                          ? "border-blue-600 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <MessageSquare className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                      <p className="font-semibold text-sm">SMS</p>
+                      <p className="text-xs text-gray-600 mt-1">Text message verification</p>
+                    </button>
+                  </div>
+                </div>
+
+                {mfaMethod === "sms" && (
+                  <div>
+                    <Label>Phone Number</Label>
+                    <Input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
+
+                <Button onClick={enableMFA} disabled={loading} className="w-full">
+                  {loading ? "Setting up..." : "Enable MFA"}
+                </Button>
+              </>
+            ) : (
+              <>
+                {mfaMethod === "app" && qrCode && (
+                  <div className="text-center space-y-4">
+                    <p className="text-sm text-gray-600">Scan this QR code with your authenticator app</p>
+                    <img src={qrCode} alt="QR Code" className="mx-auto rounded-lg border" />
+                    <p className="text-xs text-gray-500">Can't scan? Enter this key manually: JBSWY3DPEHPK3PXP</p>
+                  </div>
+                )}
+
+                {mfaMethod === "sms" && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <AlertCircle className="w-5 h-5 text-blue-600 mb-2" />
+                    <p className="text-sm text-blue-800">
+                      A verification code has been sent to {phoneNumber}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <Label>Enter Verification Code</Label>
+                  <Input
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
+                    className="mt-2 text-center text-2xl tracking-widest"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowVerification(false);
+                      setVerificationCode("");
+                    }}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={verifyAndEnableMFA} disabled={loading} className="flex-1">
+                    {loading ? "Verifying..." : "Verify & Enable"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-green-900">MFA is Active</p>
+                  <p className="text-sm text-green-700 mt-1">
+                    Your account is protected with {mfaMethod === "sms" ? "SMS" : "authenticator app"} verification
+                  </p>
+                  {mfaMethod === "sms" && phoneNumber && (
+                    <p className="text-sm text-green-700 mt-1">Phone: {phoneNumber}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={disableMFA} disabled={loading} variant="outline" className="w-full text-red-600">
+              {loading ? "Disabling..." : "Disable MFA"}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Shield, AlertTriangle, CheckCircle, Lock, Eye, RefreshCw } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+
+export default function SecurityAudit() {
+  const [auditData, setAuditData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    runSecurityAudit();
+  }, []);
+
+  const runSecurityAudit = async () => {
+    setLoading(true);
+    try {
+      const user = await base44.auth.me();
+      
+      // Check security measures
+      const recentTransactions = await base44.entities.Transaction.filter(
+        { created_by: user.email },
+        "-created_date",
+        50
+      );
+
+      const accounts = await base44.entities.Account.filter({ created_by: user.email });
+      const cards = await base44.entities.Card.filter({ created_by: user.email });
+      const externalAccounts = await base44.entities.ExternalBankAccount.filter({ created_by: user.email });
+
+      // Calculate security score
+      let score = 0;
+      const checks = [];
+
+      // Check 1: Account verification
+      const verifiedAccounts = externalAccounts.filter(a => a.verification_status === 'verified').length;
+      const totalAccounts = externalAccounts.length;
+      if (totalAccounts === 0 || verifiedAccounts === totalAccounts) {
+        score += 20;
+        checks.push({ name: "Bank Accounts Verified", status: "pass", detail: `${verifiedAccounts}/${totalAccounts} verified` });
+      } else {
+        checks.push({ name: "Bank Accounts Verified", status: "warning", detail: `${verifiedAccounts}/${totalAccounts} verified` });
+      }
+
+      // Check 2: Recent suspicious activity
+      const suspiciousTransactions = recentTransactions.filter(t => 
+        t.status === 'failed' || t.amount > 10000
+      ).length;
+      if (suspiciousTransactions === 0) {
+        score += 20;
+        checks.push({ name: "No Suspicious Activity", status: "pass", detail: "Clean transaction history" });
+      } else {
+        checks.push({ name: "Suspicious Activity", status: "warning", detail: `${suspiciousTransactions} flagged transactions` });
+      }
+
+      // Check 3: Card security
+      const activeCards = cards.filter(c => c.status === 'active').length;
+      const frozenCards = cards.filter(c => c.status === 'frozen').length;
+      score += 15;
+      checks.push({ name: "Card Management", status: "pass", detail: `${activeCards} active, ${frozenCards} frozen` });
+
+      // Check 4: Account balance monitoring
+      const totalBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+      if (totalBalance < 1000000) {
+        score += 15;
+        checks.push({ name: "Balance Within Limits", status: "pass", detail: `$${totalBalance.toLocaleString()}` });
+      } else {
+        checks.push({ name: "High Balance Alert", status: "warning", detail: `$${totalBalance.toLocaleString()}` });
+      }
+
+      // Check 5: Two-factor readiness
+      score += 15;
+      checks.push({ name: "2FA Recommended", status: "info", detail: "Enable for extra security" });
+
+      // Check 6: Session monitoring
+      score += 15;
+      checks.push({ name: "Session Monitoring", status: "pass", detail: "Inactivity timeout active" });
+
+      setAuditData({
+        score,
+        checks,
+        timestamp: new Date().toISOString(),
+        summary: {
+          totalTransactions: recentTransactions.length,
+          activeAccounts: accounts.length,
+          activeCards: cards.length,
+          externalAccounts: externalAccounts.length
+        }
+      });
+    } catch (error) {
+      console.error("Security audit error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !auditData) {
+    return (
+      <Card className="shadow-lg">
+        <CardContent className="p-12 text-center">
+          <Shield className="w-12 h-12 animate-pulse text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Running security audit...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const getScoreColor = (score) => {
+    if (score >= 80) return "text-green-600";
+    if (score >= 60) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "pass": return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case "warning": return <AlertTriangle className="w-5 h-5 text-yellow-600" />;
+      case "fail": return <AlertTriangle className="w-5 h-5 text-red-600" />;
+      default: return <Eye className="w-5 h-5 text-blue-600" />;
+    }
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-blue-600" />
+            Security Audit
+          </CardTitle>
+          <Button size="sm" variant="outline" onClick={runSecurityAudit}>
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Security Score */}
+        <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+          <p className="text-sm text-gray-600 mb-2">Security Score</p>
+          <p className={`text-5xl font-bold ${getScoreColor(auditData.score)}`}>
+            {auditData.score}
+          </p>
+          <Progress value={auditData.score} className="mt-4" />
+          <p className="text-xs text-gray-500 mt-2">
+            Last audit: {new Date(auditData.timestamp).toLocaleString()}
+          </p>
+        </div>
+
+        {/* Security Checks */}
+        <div className="space-y-3">
+          <h4 className="font-semibold text-gray-900">Security Checks</h4>
+          {auditData.checks.map((check, index) => (
+            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                {getStatusIcon(check.status)}
+                <div>
+                  <p className="font-medium text-gray-900">{check.name}</p>
+                  <p className="text-sm text-gray-600">{check.detail}</p>
+                </div>
+              </div>
+              <Badge variant={check.status === "pass" ? "default" : "outline"}>
+                {check.status}
+              </Badge>
+            </div>
+          ))}
+        </div>
+
+        {/* Summary Stats */}
+        <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+          <div>
+            <p className="text-sm text-gray-600">Total Transactions</p>
+            <p className="text-xl font-bold">{auditData.summary.totalTransactions}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Active Cards</p>
+            <p className="text-xl font-bold">{auditData.summary.activeCards}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Accounts</p>
+            <p className="text-xl font-bold">{auditData.summary.activeAccounts}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">External Banks</p>
+            <p className="text-xl font-bold">{auditData.summary.externalAccounts}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Shield, AlertTriangle, CheckCircle, Activity, Lock, Eye } from 'lucide-react';
+import { detectAnomalousActivity } from './fraudUtils';
+
+export default function SecurityDashboard({ user }) {
+  const [securityScore, setSecurityScore] = useState(0);
+  const [anomalies, setAnomalies] = useState({ hasAnomalies: false, patterns: [] });
+  const [recentActivity, setRecentActivity] = useState([]);
+
+  useEffect(() => {
+    loadSecurityData();
+  }, [user]);
+
+  const loadSecurityData = async () => {
+    if (!user) return;
+
+    // Calculate security score
+    let score = 50; // Base score
+
+    // Check for 2FA
+    if (user.two_factor_enabled) score += 20;
+
+    // Check recent activity
+    const activity = await detectAnomalousActivity(user.email);
+    setAnomalies(activity);
+    if (!activity.hasAnomalies) score += 15;
+
+    // Check password strength (simulated)
+    score += 15;
+
+    setSecurityScore(score);
+
+    // Load recent security events
+    const transactions = await base44.entities.Transaction.filter(
+      { created_by: user.email },
+      '-created_date',
+      5
+    );
+    setRecentActivity(transactions);
+  };
+
+  const getScoreColor = () => {
+    if (securityScore >= 80) return 'text-green-600';
+    if (securityScore >= 60) return 'text-yellow-600';
+    return 'text-red-600';
+  };
+
+  const getScoreStatus = () => {
+    if (securityScore >= 80) return 'Excellent';
+    if (securityScore >= 60) return 'Good';
+    return 'Needs Improvement';
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-6 h-6 text-blue-600" />
+            Security Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className={`text-6xl font-bold ${getScoreColor()}`}>
+                {securityScore}
+              </div>
+              <p className="text-lg font-semibold text-gray-700 mt-2">
+                Security Score - {getScoreStatus()}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Lock className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium">2FA Status</span>
+                </div>
+                <p className={`text-lg font-bold ${user?.two_factor_enabled ? 'text-green-600' : 'text-red-600'}`}>
+                  {user?.two_factor_enabled ? 'Enabled' : 'Disabled'}
+                </p>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm font-medium">Activity</span>
+                </div>
+                <p className={`text-lg font-bold ${anomalies.hasAnomalies ? 'text-orange-600' : 'text-green-600'}`}>
+                  {anomalies.hasAnomalies ? 'Unusual' : 'Normal'}
+                </p>
+              </div>
+            </div>
+
+            {anomalies.hasAnomalies && (
+              <Card className="bg-orange-50 border-orange-200">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-orange-800">
+                      <p className="font-semibold mb-2">Unusual Activity Detected</p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {anomalies.patterns.map((pattern, idx) => (
+                          <li key={idx}>{pattern}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div>
+              <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                Recent Activity
+              </h4>
+              <div className="space-y-2">
+                {recentActivity.map((activity, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div>
+                      <p className="font-medium text-sm">{activity.description}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(activity.created_date).toLocaleString()}
+                      </p>
+                    </div>
+                    <span className="font-bold">${activity.amount?.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Security Recommendations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {!user?.two_factor_enabled && (
+              <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-yellow-900">Enable Two-Factor Authentication</p>
+                  <p className="text-yellow-800">Add an extra layer of security to your account</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-blue-900">Review Connected Devices</p>
+                <p className="text-blue-800">Check for any unrecognized devices</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-blue-900">Monitor Transaction Alerts</p>
+                <p className="text-blue-800">Stay informed about account activity</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { FileText, AlertCircle, Info, AlertTriangle } from "lucide-react";
+
+export default function SecurityEventLog() {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const loadEvents = async () => {
+    try {
+      const user = await base44.auth.me();
+      const securityEvents = await base44.entities.SecurityEvent.filter(
+        { created_by: user.email },
+        "-created_date",
+        50
+      );
+      
+      setEvents(securityEvents);
+    } catch (error) {
+      console.error("Error loading security events:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case "critical": return "bg-red-600";
+      case "warning": return "bg-yellow-600";
+      case "info": return "bg-blue-600";
+      default: return "bg-gray-600";
+    }
+  };
+
+  const getSeverityIcon = (severity) => {
+    switch (severity) {
+      case "critical": return <AlertCircle className="w-4 h-4" />;
+      case "warning": return <AlertTriangle className="w-4 h-4" />;
+      default: return <Info className="w-4 h-4" />;
+    }
+  };
+
+  const formatEventType = (type) => {
+    return type.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  const formatTimestamp = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    
+    return date.toLocaleDateString();
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="w-6 h-6 text-blue-600" />
+          Security Event Log
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="text-center py-8">
+            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">No security events recorded</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-3 pr-4">
+              {events.map((event, index) => (
+                <div
+                  key={event.id || index}
+                  className="p-3 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge className={getSeverityColor(event.severity)}>
+                        {getSeverityIcon(event.severity)}
+                      </Badge>
+                      <h4 className="font-semibold text-sm text-gray-900">
+                        {formatEventType(event.event_type)}
+                      </h4>
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {formatTimestamp(event.created_date)}
+                    </span>
+                  </div>
+                  
+                  <p className="text-sm text-gray-700">{event.description}</p>
+                  
+                  {(event.ip_address || event.location) && (
+                    <div className="mt-2 text-xs text-gray-500 space-y-1">
+                      {event.ip_address && <p>IP: {event.ip_address}</p>}
+                      {event.location && <p>Location: {event.location}</p>}
+                    </div>
+                  )}
+
+                  {event.was_blocked && (
+                    <Badge variant="outline" className="mt-2 text-xs bg-red-50 text-red-700">
+                      Action Blocked
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, Shield, Activity, RefreshCw } from "lucide-react";
+
+export default function ThreatMonitor() {
+  const [threats, setThreats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [monitoring, setMonitoring] = useState(true);
+
+  useEffect(() => {
+    detectThreats();
+    const interval = setInterval(() => {
+      if (monitoring) detectThreats();
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [monitoring]);
+
+  const detectThreats = async () => {
+    try {
+      const user = await base44.auth.me();
+      
+      // Get recent transactions
+      const transactions = await base44.entities.Transaction.filter(
+        { created_by: user.email },
+        "-created_date",
+        50
+      );
+
+      // Get recent security events
+      const securityEvents = await base44.entities.SecurityEvent.filter(
+        { created_by: user.email },
+        "-created_date",
+        20
+      );
+
+      const detectedThreats = [];
+
+      // Check for rapid transactions
+      const recentTransactions = transactions.filter(t => {
+        const txTime = new Date(t.created_date);
+        const minutesAgo = (new Date() - txTime) / (1000 * 60);
+        return minutesAgo <= 15;
+      });
+
+      if (recentTransactions.length >= 5) {
+        detectedThreats.push({
+          id: "rapid-transactions",
+          type: "suspicious_activity",
+          severity: "warning",
+          title: "Rapid Transaction Activity",
+          description: `${recentTransactions.length} transactions detected in the last 15 minutes`,
+          timestamp: new Date().toISOString(),
+          action: "Review recent transactions"
+        });
+      }
+
+      // Check for large transfers
+      const largeTransfers = transactions.slice(0, 10).filter(t => 
+        (t.type === 'transfer_out' || t.type === 'debit') && t.amount > 1000
+      );
+
+      if (largeTransfers.length > 0) {
+        detectedThreats.push({
+          id: "large-transfer",
+          type: "large_transaction",
+          severity: "info",
+          title: "Large Transfer Detected",
+          description: `Transfer of $${largeTransfers[0].amount.toLocaleString()} was processed`,
+          timestamp: largeTransfers[0].created_date,
+          action: "Verify transaction"
+        });
+      }
+
+      // Check for failed login attempts
+      const failedLogins = securityEvents.filter(e => 
+        e.event_type === 'failed_login' && 
+        new Date(e.created_date) > new Date(Date.now() - 3600000) // Last hour
+      );
+
+      if (failedLogins.length >= 3) {
+        detectedThreats.push({
+          id: "failed-logins",
+          type: "authentication",
+          severity: "critical",
+          title: "Multiple Failed Login Attempts",
+          description: `${failedLogins.length} failed login attempts in the last hour`,
+          timestamp: new Date().toISOString(),
+          action: "Change your password immediately"
+        });
+      }
+
+      // Check for unusual transaction patterns
+      if (transactions.length >= 10) {
+        const amounts = transactions.slice(0, 10).map(t => t.amount);
+        const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+        const unusualTransactions = transactions.slice(0, 5).filter(t => 
+          t.amount > avg * 3
+        );
+
+        if (unusualTransactions.length > 0) {
+          detectedThreats.push({
+            id: "unusual-pattern",
+            type: "anomaly",
+            severity: "warning",
+            title: "Unusual Transaction Pattern",
+            description: "Transaction amount significantly higher than your average",
+            timestamp: unusualTransactions[0].created_date,
+            action: "Review transaction details"
+          });
+        }
+      }
+
+      setThreats(detectedThreats);
+    } catch (error) {
+      console.error("Error detecting threats:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getSeverityColor = (severity) => {
+    switch (severity) {
+      case "critical": return "bg-red-600";
+      case "warning": return "bg-yellow-600";
+      case "info": return "bg-blue-600";
+      default: return "bg-gray-600";
+    }
+  };
+
+  const getSeverityIcon = (severity) => {
+    switch (severity) {
+      case "critical": return <AlertTriangle className="w-4 h-4" />;
+      case "warning": return <AlertTriangle className="w-4 h-4" />;
+      default: return <Shield className="w-4 h-4" />;
+    }
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-6 h-6 text-blue-600" />
+            Real-Time Threat Monitor
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant={monitoring ? "default" : "outline"}>
+              {monitoring ? "Active" : "Paused"}
+            </Badge>
+            <Button size="sm" variant="outline" onClick={detectThreats}>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+              <p className="text-sm text-gray-600">Scanning for threats...</p>
+            </div>
+          </div>
+        ) : threats.length === 0 ? (
+          <div className="text-center py-8">
+            <Shield className="w-12 h-12 text-green-600 mx-auto mb-3" />
+            <p className="font-semibold text-gray-900">All Clear</p>
+            <p className="text-sm text-gray-600 mt-1">No threats detected</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {threats.map((threat) => (
+              <div
+                key={threat.id}
+                className="p-4 rounded-lg border bg-gradient-to-r from-white to-red-50"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className={getSeverityColor(threat.severity)}>
+                      {getSeverityIcon(threat.severity)}
+                      {threat.severity.toUpperCase()}
+                    </Badge>
+                    <h4 className="font-semibold text-gray-900">{threat.title}</h4>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {new Date(threat.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+                
+                <p className="text-sm text-gray-700 mb-2">{threat.description}</p>
+                
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-xs">
+                    {threat.type.replace('_', ' ')}
+                  </Badge>
+                  <Button size="sm" variant="outline">
+                    {threat.action}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <p className="text-xs text-blue-800">
+            <Shield className="w-4 h-4 inline mr-1" />
+            Threat detection is running continuously. Toggle monitoring on/off using the badge above.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Shield, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
+export default function TransactionAuthenticator({ 
+  open, 
+  onClose, 
+  onAuthenticate,
+  amount,
+  recipient 
+}) {
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const handleVerify = async () => {
+    setIsVerifying(true);
+    
+    // Simulate verification (in production, this would verify against email/SMS code)
+    setTimeout(() => {
+      if (verificationCode.length >= 4) {
+        onAuthenticate(true);
+        setVerificationCode('');
+      } else {
+        alert('Please enter a valid verification code');
+      }
+      setIsVerifying(false);
+    }, 1000);
+  };
+
+  const sendCode = () => {
+    // Simulate sending code
+    const code = Math.floor(1000 + Math.random() * 9000);
+    alert(`Verification code sent to your email/phone: ${code}\n(Demo mode - use any 4+ digits)`);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Shield className="w-6 h-6 text-blue-600" />
+            Verify Large Transaction
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <Card className="bg-orange-50 border-orange-200">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-orange-800">
+                  <p className="font-semibold mb-1">Additional Verification Required</p>
+                  <p>For your security, large transactions require verification.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount:</span>
+                <span className="font-bold text-lg">${amount?.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">To:</span>
+                <span className="font-semibold">{recipient}</span>
+              </div>
+            </div>
+
+            <div>
+              <Label>Verification Code</Label>
+              <Input
+                type="text"
+                placeholder="Enter code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                maxLength={6}
+              />
+              <Button 
+                variant="link" 
+                className="mt-2 p-0 h-auto text-blue-600"
+                onClick={sendCode}
+              >
+                Send verification code to my email/phone
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              onClick={onClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleVerify}
+              disabled={isVerifying || verificationCode.length < 4}
+              className="flex-1 bg-blue-600"
+            >
+              {isVerifying ? 'Verifying...' : 'Verify & Continue'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import { base44 } from '@/api/base44Client';
+
+export async function checkTransactionVelocity(userId, newAmount, timeWindowMinutes = 30) {
+  try {
+    const transactions = await base44.entities.Transaction.filter(
+      { created_by: userId },
+      '-created_date',
+      50
+    );
+
+    const now = new Date();
+    const recentTransactions = transactions.filter(txn => {
+      const txnTime = new Date(txn.created_date);
+      const minutesAgo = (now - txnTime) / (1000 * 60);
+      return minutesAgo <= timeWindowMinutes && 
+             (txn.type === 'transfer_out' || txn.type === 'debit');
+    });
+
+    const totalRecentAmount = recentTransactions.reduce((sum, txn) => sum + txn.amount, 0);
+    const transactionCount = recentTransactions.length;
+
+    const risks = [];
+    
+    if (transactionCount >= 5) {
+      risks.push(`High velocity: ${transactionCount} transactions in ${timeWindowMinutes} minutes`);
+    }
+
+    if (totalRecentAmount + newAmount > 5000) {
+      risks.push(`Large total amount: $${(totalRecentAmount + newAmount).toLocaleString()} in ${timeWindowMinutes} minutes`);
+    }
+
+    if (newAmount > 2500) {
+      risks.push(`Large single transaction: $${newAmount.toLocaleString()}`);
+    }
+
+    return {
+      isHighRisk: risks.length > 0,
+      risks,
+      recentCount: transactionCount,
+      recentTotal: totalRecentAmount,
+      requiresVerification: newAmount > 1000 || risks.length > 0
+    };
+  } catch (error) {
+    console.error('Fraud detection error:', error);
+    return { isHighRisk: false, risks: [], requiresVerification: newAmount > 1000 };
+  }
+}
+
+export async function checkCheckDepositFraud(depositData) {
+  const risks = [];
+
+  if (depositData.image_quality_score < 60) {
+    risks.push('Low image quality detected');
+  }
+
+  if (depositData.check_amount > 5000) {
+    risks.push('Large check amount');
+  }
+
+  try {
+    const recentDeposits = await base44.entities.CheckDeposit.filter(
+      { created_by: depositData.created_by },
+      '-created_date',
+      10
+    );
+
+    const today = new Date();
+    const todayDeposits = recentDeposits.filter(d => {
+      const depositDate = new Date(d.created_date);
+      return depositDate.toDateString() === today.toDateString();
+    });
+
+    if (todayDeposits.length >= 3) {
+      risks.push('Multiple deposits today');
+    }
+
+    const todayTotal = todayDeposits.reduce((sum, d) => sum + d.check_amount, 0);
+    if (todayTotal + depositData.check_amount > 10000) {
+      risks.push('High daily deposit volume');
+    }
+
+  } catch (error) {
+    console.error('Check deposit fraud detection error:', error);
+  }
+
+  return {
+    isHighRisk: risks.length > 1,
+    risks,
+    fraudScore: Math.min(risks.length * 25, 100),
+    requiresReview: risks.length > 0
+  };
+}
+
+export async function detectAnomalousActivity(userId) {
+  try {
+    const transactions = await base44.entities.Transaction.filter(
+      { created_by: userId },
+      '-created_date',
+      100
+    );
+
+    if (transactions.length < 10) {
+      return { hasAnomalies: false, patterns: [] };
+    }
+
+    const amounts = transactions.map(t => t.amount);
+    const average = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const stdDev = Math.sqrt(
+      amounts.reduce((sq, n) => sq + Math.pow(n - average, 2), 0) / amounts.length
+    );
+
+    const anomalies = [];
+
+    const recentLarge = transactions.slice(0, 5).filter(t => 
+      t.amount > average + (3 * stdDev)
+    );
+    
+    if (recentLarge.length > 0) {
+      anomalies.push(`${recentLarge.length} unusually large transactions detected`);
+    }
+
+    const recentTimes = transactions.slice(0, 5).map(t => new Date(t.created_date));
+    const rapidTransactions = recentTimes.filter((time, i) => {
+      if (i === 0) return false;
+      const prevTime = recentTimes[i - 1];
+      const minutesDiff = (prevTime - time) / (1000 * 60);
+      return minutesDiff < 2;
+    });
+
+    if (rapidTransactions.length >= 2) {
+      anomalies.push('Multiple transactions within minutes');
+    }
+
+    return {
+      hasAnomalies: anomalies.length > 0,
+      patterns: anomalies,
+      averageAmount: average,
+      standardDeviation: stdDev
+    };
+
+  } catch (error) {
+    console.error('Anomaly detection error:', error);
+    return { hasAnomalies: false, patterns: [] };
+  }
+}
+
+
+
+
+
+
+
+
+

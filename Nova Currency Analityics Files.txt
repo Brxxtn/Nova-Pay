@@ -1,0 +1,645 @@
+import React, { useState, useEffect, useRef } from "react";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { MessageCircle, Send, Loader2, Bot, User as UserIcon, Sparkles } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+export default function FinancialAdvisor({ user, account, transactions, cryptoHoldings }) {
+  const [messages, setMessages] = useState([
+    {
+      role: "assistant",
+      content: "👋 Hi! I'm your AI Financial Advisor. Ask me about investing, crypto, budgeting, or any financial topic!"
+    }
+  ]);
+  const [input, setInput] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!input.trim() || isThinking) return;
+
+    const userMessage = input.trim();
+    setInput("");
+    
+    setMessages(prev => [...prev, { role: "user", content: userMessage }]);
+    setIsThinking(true);
+
+    try {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a helpful financial advisor AI. Answer this question clearly and concisely: ${userMessage}
+        
+If the question is about current market prices, stocks, crypto, or financial news - search the internet for the most current information.
+
+Keep your response conversational, friendly, and under 3 paragraphs.`,
+        add_context_from_internet: true
+      });
+
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: response 
+      }]);
+
+    } catch (error) {
+      console.error("Error getting AI response:", error);
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "Sorry, I encountered an error. Please try again." 
+      }]);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  return (
+    <Card className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-purple-200 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bot className="w-6 h-6 text-purple-600" />
+          AI Financial Advisor
+          <Sparkles className="w-4 h-4 text-yellow-500" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <ScrollArea ref={scrollRef} className="h-[400px] bg-white rounded-lg p-4">
+          <div className="space-y-4">
+            {messages.map((message, index) => (
+              <div
+                key={index}
+                className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                {message.role === 'assistant' && (
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-5 h-5 text-white" />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[80%] rounded-2xl p-4 ${
+                    message.role === 'user'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                </div>
+                {message.role === 'user' && (
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <UserIcon className="w-5 h-5 text-white" />
+                  </div>
+                )}
+              </div>
+            ))}
+            {isThinking && (
+              <div className="flex gap-3 justify-start">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                </div>
+                <div className="bg-gray-100 rounded-2xl p-4">
+                  <p className="text-sm text-gray-600">Thinking...</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        <div className="flex gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Ask about investing, crypto, budgeting, or markets..."
+            disabled={isThinking}
+            className="flex-1"
+          />
+          <Button
+            onClick={handleSendMessage}
+            disabled={!input.trim() || isThinking}
+            className="bg-gradient-to-r from-purple-600 to-pink-600"
+          >
+            {isThinking ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+
+        <p className="text-xs text-gray-500 text-center">
+          💡 Ask me anything about finance, investing, crypto, or markets
+        </p>
+      </CardContent>
+    </Card>
+  );
+
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+
+const COLORS = {
+  food: '#f59e0b',
+  shopping: '#ec4899',
+  gas: '#3b82f6',
+  entertainment: '#8b5cf6',
+  bills: '#ef4444',
+  crypto: '#f97316',
+  transfer: '#10b981',
+  other: '#6b7280'
+};
+
+export default function CategoryBreakdown({ transactions }) {
+  const prepareChartData = () => {
+    const categoryTotals = {};
+    
+    transactions
+      .filter(t => ['debit', 'transfer_out'].includes(t.type))
+      .forEach(t => {
+        const category = t.category || 'other';
+        categoryTotals[category] = (categoryTotals[category] || 0) + Math.abs(t.amount);
+      });
+
+    return Object.entries(categoryTotals)
+      .map(([name, value]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        value: parseFloat(value.toFixed(2)),
+        color: COLORS[name] || COLORS.other
+      }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  const data = prepareChartData();
+
+  if (data.length === 0) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Spending by Category</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-[400px] text-gray-500">
+            No spending data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Spending by Category</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+              outerRadius={120}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => `$${value.toFixed(2)}`} />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+        
+        <div className="mt-6 space-y-2">
+          {data.map((category, idx) => (
+            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-4 h-4 rounded-full" 
+                  style={{ backgroundColor: category.color }}
+                />
+                <span className="font-medium">{category.name}</span>
+              </div>
+              <span className="font-bold">${category.value.toFixed(2)}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
+export default function IncomeVsExpenses({ transactions }) {
+  const prepareChartData = () => {
+    const monthlyData = {};
+    
+    transactions.forEach(t => {
+      const date = new Date(t.created_date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { month: monthKey, income: 0, expenses: 0 };
+      }
+      
+      if (['credit', 'transfer_in'].includes(t.type)) {
+        monthlyData[monthKey].income += t.amount;
+      } else {
+        monthlyData[monthKey].expenses += Math.abs(t.amount);
+      }
+    });
+
+    return Object.values(monthlyData)
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-6)
+      .map(item => ({
+        month: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        income: parseFloat(item.income.toFixed(2)),
+        expenses: parseFloat(item.expenses.toFixed(2))
+      }));
+  };
+
+  const data = prepareChartData();
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Income vs Expenses</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis 
+              dataKey="month" 
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+              tickFormatter={(value) => `$${value}`}
+            />
+            <Tooltip 
+              formatter={(value) => `$${value.toFixed(2)}`}
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px'
+              }}
+            />
+            <Legend />
+            <Bar dataKey="income" fill="#10b981" name="Income" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+
+export default function MonthlyComparison({ transactions }) {
+  const prepareChartData = () => {
+    const currentYear = new Date().getFullYear();
+    const lastYear = currentYear - 1;
+    
+    const monthlyData = Array.from({ length: 12 }, (_, i) => ({
+      month: new Date(2024, i).toLocaleDateString('en-US', { month: 'short' }),
+      currentYear: 0,
+      lastYear: 0
+    }));
+
+    transactions.forEach(t => {
+      if (!['debit', 'transfer_out'].includes(t.type)) return;
+      
+      const date = new Date(t.created_date);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      
+      if (year === currentYear) {
+        monthlyData[month].currentYear += Math.abs(t.amount);
+      } else if (year === lastYear) {
+        monthlyData[month].lastYear += Math.abs(t.amount);
+      }
+    });
+
+    return monthlyData.map(item => ({
+      ...item,
+      currentYear: parseFloat(item.currentYear.toFixed(2)),
+      lastYear: parseFloat(item.lastYear.toFixed(2))
+    }));
+  };
+
+  const data = prepareChartData();
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Year-over-Year Comparison</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis 
+              dataKey="month" 
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+              tickFormatter={(value) => `$${value}`}
+            />
+            <Tooltip 
+              formatter={(value) => `$${value.toFixed(2)}`}
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px'
+              }}
+            />
+            <Bar dataKey="currentYear" fill="#3b82f6" name={new Date().getFullYear()} radius={[8, 8, 0, 0]} />
+            <Bar dataKey="lastYear" fill="#93c5fd" name={new Date().getFullYear() - 1} radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+export default function SpendingHeatmap({ transactions }) {
+  const getHeatmapData = () => {
+    const heatmap = Array.from({ length: 7 }, () => Array(24).fill(0));
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    transactions
+      .filter(t => ['debit', 'transfer_out'].includes(t.type))
+      .forEach(t => {
+        const date = new Date(t.created_date);
+        const day = date.getDay();
+        const hour = date.getHours();
+        heatmap[day][hour] += Math.abs(t.amount);
+      });
+
+    return { heatmap, days };
+  };
+
+  const { heatmap, days } = getHeatmapData();
+  const maxValue = Math.max(...heatmap.flat());
+
+  const getColor = (value) => {
+    if (value === 0) return 'bg-gray-100';
+    const intensity = value / maxValue;
+    if (intensity > 0.7) return 'bg-red-600';
+    if (intensity > 0.5) return 'bg-red-500';
+    if (intensity > 0.3) return 'bg-red-400';
+    if (intensity > 0.1) return 'bg-red-300';
+    return 'bg-red-200';
+  };
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Spending Heatmap (By Day & Hour)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <div className="flex gap-1">
+            <div className="flex flex-col gap-1 justify-end pb-6">
+              {days.map((day, idx) => (
+                <div key={idx} className="h-4 text-xs text-gray-600 flex items-center pr-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            <div className="space-y-1">
+              <div className="flex gap-1 mb-1">
+                {Array.from({ length: 24 }, (_, i) => (
+                  <div key={i} className="w-4 text-xs text-gray-600 text-center">
+                    {i % 3 === 0 ? i : ''}
+                  </div>
+                ))}
+              </div>
+              
+              {heatmap.map((dayData, dayIdx) => (
+                <div key={dayIdx} className="flex gap-1">
+                  {dayData.map((value, hourIdx) => (
+                    <div
+                      key={hourIdx}
+                      className={`w-4 h-4 rounded-sm ${getColor(value)} cursor-pointer transition-transform hover:scale-125`}
+                      title={`${days[dayIdx]} ${hourIdx}:00 - $${value.toFixed(2)}`}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4 mt-6 justify-center">
+          <span className="text-xs text-gray-600">Less</span>
+          <div className="flex gap-1">
+            <div className="w-4 h-4 bg-gray-100 rounded-sm" />
+            <div className="w-4 h-4 bg-red-200 rounded-sm" />
+            <div className="w-4 h-4 bg-red-300 rounded-sm" />
+            <div className="w-4 h-4 bg-red-400 rounded-sm" />
+            <div className="w-4 h-4 bg-red-500 rounded-sm" />
+            <div className="w-4 h-4 bg-red-600 rounded-sm" />
+          </div>
+          <span className="text-xs text-gray-600">More</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+
+export default function SpendingTrendChart({ transactions, timeRange }) {
+  const prepareChartData = () => {
+    const days = parseInt(timeRange);
+    const data = [];
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayTransactions = transactions.filter(t => {
+        const txDate = new Date(t.created_date).toISOString().split('T')[0];
+        return txDate === dateStr;
+      });
+
+      const spent = dayTransactions
+        .filter(t => ['debit', 'transfer_out'].includes(t.type))
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+      const earned = dayTransactions
+        .filter(t => ['credit', 'transfer_in'].includes(t.type))
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      data.push({
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        spent: parseFloat(spent.toFixed(2)),
+        earned: parseFloat(earned.toFixed(2))
+      });
+    }
+
+    return data;
+  };
+
+  const data = prepareChartData();
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Spending & Income Trends</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis 
+              dataKey="date" 
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+            />
+            <YAxis 
+              tick={{ fontSize: 12 }}
+              stroke="#6b7280"
+              tickFormatter={(value) => `$${value}`}
+            />
+            <Tooltip 
+              formatter={(value) => `$${value.toFixed(2)}`}
+              contentStyle={{
+                backgroundColor: 'white',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px'
+              }}
+            />
+            <Legend />
+            <Line 
+              type="monotone" 
+              dataKey="spent" 
+              stroke="#ef4444" 
+              strokeWidth={2}
+              dot={{ fill: '#ef4444', r: 4 }}
+              activeDot={{ r: 6 }}
+              name="Spent"
+            />
+            <Line 
+              type="monotone" 
+              dataKey="earned" 
+              stroke="#10b981" 
+              strokeWidth={2}
+              dot={{ fill: '#10b981', r: 4 }}
+              activeDot={{ r: 6 }}
+              name="Earned"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Store } from "lucide-react";
+
+export default function TopMerchants({ transactions }) {
+  const getMerchantData = () => {
+    const merchantTotals = {};
+    
+    transactions
+      .filter(t => ['debit', 'transfer_out'].includes(t.type) && t.merchant)
+      .forEach(t => {
+        merchantTotals[t.merchant] = (merchantTotals[t.merchant] || 0) + Math.abs(t.amount);
+      });
+
+    return Object.entries(merchantTotals)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 10);
+  };
+
+  const merchants = getMerchantData();
+
+  if (merchants.length === 0) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Top Merchants</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-[400px] text-gray-500">
+            No merchant data available
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const maxAmount = Math.max(...merchants.map(m => m.amount));
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Top Merchants</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {merchants.map((merchant, idx) => (
+            <div key={idx} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Store className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <span className="font-medium">{merchant.name}</span>
+                </div>
+                <span className="font-bold text-gray-900">${merchant.amount.toFixed(2)}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all"
+                  style={{ width: `${(merchant.amount / maxAmount) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+

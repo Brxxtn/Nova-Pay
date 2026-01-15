@@ -1,0 +1,1234 @@
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Shield, FileText, AlertTriangle } from "lucide-react";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+
+export default function LegalSection() {
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Legal & Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <Link to={createPageUrl("PrivacyPolicy")}>
+            <Button variant="ghost" className="w-full justify-start">
+              <Shield className="w-4 h-4 mr-3" />
+              Privacy Policy
+            </Button>
+          </Link>
+          
+          <Link to={createPageUrl("TermsOfService")}>
+            <Button variant="ghost" className="w-full justify-start">
+              <FileText className="w-4 h-4 mr-3" />
+              Terms of Service
+            </Button>
+          </Link>
+
+          <Link to={createPageUrl("TradingDisclaimer")}>
+            <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50">
+              <AlertTriangle className="w-4 h-4 mr-3" />
+              Trading Simulator Disclaimer
+            </Button>
+          </Link>
+
+          <Link to={createPageUrl("Licenses")}>
+            <Button variant="ghost" className="w-full justify-start">
+              <FileText className="w-4 h-4 mr-3" />
+              Licenses & Compliance
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+
+export default function NotificationSettings({ user, onUpdate }) {
+  const [notifications, setNotifications] = useState({
+    email_transactions: true,
+    email_security: true,
+    email_promotions: false,
+    sms_security: true,
+  });
+
+  useEffect(() => {
+    if (user?.notifications) {
+      setNotifications(user.notifications);
+    }
+  }, [user]);
+
+  const handleSettingChange = (key, value) => {
+    const newSettings = { ...notifications, [key]: value };
+    setNotifications(newSettings);
+    onUpdate({ notifications: newSettings });
+  };
+  
+  const SettingRow = ({ id, label, description, checked, onCheckedChange }) => (
+    <div className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
+      <div className="flex-1">
+        <Label htmlFor={id} className="font-medium cursor-pointer">{label}</Label>
+        <p className="text-sm text-gray-600 max-w-md mt-1">{description}</p>
+      </div>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+      />
+    </div>
+  );
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Notification Settings</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <h3 className="font-semibold mb-3 text-lg">Email Notifications</h3>
+          <div className="space-y-4">
+            <SettingRow 
+              id="email-transactions"
+              label="Transactions & Receipts"
+              description="Receive an email for every transaction and a monthly statement."
+              checked={notifications.email_transactions}
+              onCheckedChange={(val) => handleSettingChange('email_transactions', val)}
+            />
+            <SettingRow 
+              id="email-security"
+              label="Security Alerts"
+              description="Get notified about new logins and important security events."
+              checked={notifications.email_security}
+              onCheckedChange={(val) => handleSettingChange('email_security', val)}
+            />
+            <SettingRow 
+              id="email-promotions"
+              label="Promotions & News"
+              description="Receive news, feature updates, and special offers."
+              checked={notifications.email_promotions}
+              onCheckedChange={(val) => handleSettingChange('email_promotions', val)}
+            />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-semibold mb-3 text-lg">SMS Notifications</h3>
+          <div className="space-y-4">
+            <SettingRow 
+              id="sms-security"
+              label="Security Alerts"
+              description="Receive critical security alerts via SMS for immediate action."
+              checked={notifications.sms_security}
+              onCheckedChange={(val) => handleSettingChange('sms_security', val)}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { User, Mail, Phone, MapPin, Calendar, CheckCircle2 } from "lucide-react";
+
+export default function PersonalInfo({ user, onUpdate }) {
+  const [formData, setFormData] = useState({
+    full_name: '',
+    email: '',
+    phone_number: '',
+    address: '',
+    dob: '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        full_name: user.full_name || '',
+        email: user.email || '',
+        phone_number: user.phone_number || '',
+        address: user.address || '',
+        dob: user.dob || '',
+      });
+    }
+  }, [user]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setSaveSuccess(false);
+    
+    try {
+      // Don't send email as it's immutable
+      const { email, ...updateData } = formData;
+      await onUpdate(updateData);
+      
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+      alert("Failed to save changes. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Personal Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="full_name" className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                Full Name
+              </Label>
+              <Input
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                placeholder="Enter your full name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                disabled
+                className="bg-gray-100"
+              />
+              <p className="text-xs text-gray-500">Email cannot be changed</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone_number" className="flex items-center gap-2">
+                <Phone className="w-4 h-4" />
+                Phone Number
+              </Label>
+              <Input
+                id="phone_number"
+                type="tel"
+                value={formData.phone_number}
+                onChange={(e) => setFormData({...formData, phone_number: e.target.value})}
+                placeholder="+1 (555) 000-0000"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dob" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Date of Birth
+              </Label>
+              <Input
+                id="dob"
+                type="date"
+                value={formData.dob}
+                onChange={(e) => setFormData({...formData, dob: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address" className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Address
+            </Label>
+            <Input
+              id="address"
+              value={formData.address}
+              onChange={(e) => setFormData({...formData, address: e.target.value})}
+              placeholder="123 Main St, City, State, ZIP"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3">
+            {saveSuccess && (
+              <div className="flex items-center gap-2 text-green-600 mr-auto">
+                <CheckCircle2 className="w-5 h-5" />
+                <span>Changes saved successfully!</span>
+              </div>
+            )}
+            <Button 
+              type="submit" 
+              className="bg-gradient-to-r from-blue-600 to-indigo-600"
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Download, Loader2, Trash2, Shield } from "lucide-react";
+import { Account, Card as CardEntity, Transaction, CryptoHolding, PayStub, TaxDocument, SavingsGoal, BillReminder } from "@/entities/all";
+import { base44 } from "@/api/base44Client";
+
+export default function PrivacyControls({ user, onUpdate }) {
+  const [privacySettings, setPrivacySettings] = useState({
+    share_data_partners: user?.privacy?.share_data_partners || false,
+    use_for_targeting: user?.privacy?.use_for_targeting || false,
+  });
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const handleSettingChange = (key, value) => {
+    const newSettings = { ...privacySettings, [key]: value };
+    setPrivacySettings(newSettings);
+    onUpdate({ privacy: newSettings });
+  };
+
+  const handleDownloadData = async () => {
+    setIsDownloading(true);
+    try {
+      // Gather all user data
+      const [accounts, cards, transactions, cryptoHoldings, payStubs, taxDocs, goals, bills] = await Promise.all([
+        Account.filter({ created_by: user.email }),
+        CardEntity.filter({ created_by: user.email }),
+        Transaction.filter({ created_by: user.email }),
+        CryptoHolding.filter({ created_by: user.email }),
+        PayStub.filter({ created_by: user.email }),
+        TaxDocument.filter({ created_by: user.email }),
+        SavingsGoal.filter({ created_by: user.email }),
+        BillReminder.filter({ created_by: user.email })
+      ]);
+
+      const userData = {
+        export_info: {
+          generated_at: new Date().toISOString(),
+          user_email: user.email,
+          user_name: user.full_name,
+          format_version: "1.0"
+        },
+        user_profile: {
+          full_name: user.full_name,
+          email: user.email,
+          role: user.role,
+          phone_number: user.phone_number,
+          address: user.address,
+          dob: user.dob,
+          created_date: user.created_date
+        },
+        accounts: accounts,
+        cards: cards,
+        transactions: transactions,
+        crypto_holdings: cryptoHoldings,
+        pay_stubs: payStubs,
+        tax_documents: taxDocs,
+        savings_goals: goals,
+        bill_reminders: bills,
+        summary: {
+          total_accounts: accounts.length,
+          total_cards: cards.length,
+          total_transactions: transactions.length,
+          total_crypto_holdings: cryptoHoldings.length,
+          total_pay_stubs: payStubs.length,
+          total_tax_documents: taxDocs.length,
+          total_savings_goals: goals.length,
+          total_bill_reminders: bills.length
+        }
+      };
+
+      // Create and download JSON file
+      const dataStr = JSON.stringify(userData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cashflow_complete_data_export_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      alert("✅ Your complete data has been downloaded successfully!\n\nThe file contains all your financial data in JSON format.");
+    } catch (error) {
+      console.error("Error downloading data:", error);
+      alert("❌ Failed to download data. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleRequestDeletion = async () => {
+    const confirmMessage = 
+      "⚠️ CRITICAL WARNING: PERMANENT ACCOUNT DELETION\n\n" +
+      "This action will PERMANENTLY DELETE:\n" +
+      "• All your financial accounts\n" +
+      "• All cards (payment, gift, loyalty, IDs)\n" +
+      "• Complete transaction history\n" +
+      "• All cryptocurrency holdings\n" +
+      "• Pay stubs and tax documents\n" +
+      "• Savings goals and bill reminders\n" +
+      "• Your user profile\n\n" +
+      "⚠️ THIS ACTION CANNOT BE UNDONE!\n\n" +
+      "Type 'DELETE MY ACCOUNT' (in capital letters) to confirm:";
+    
+    const userInput = prompt(confirmMessage);
+    
+    if (userInput === "DELETE MY ACCOUNT") {
+      const finalConfirm = confirm(
+        "🚨 FINAL CONFIRMATION REQUIRED 🚨\n\n" +
+        "You typed the confirmation phrase correctly.\n\n" +
+        "Are you ABSOLUTELY CERTAIN you want to:\n" +
+        "• Permanently delete your CashFlow account?\n" +
+        "• Lose ALL your financial data forever?\n" +
+        "• Remove all traces of your information?\n\n" +
+        "Click OK to PERMANENTLY DELETE everything.\n" +
+        "Click Cancel to keep your account safe."
+      );
+      
+      if (finalConfirm) {
+        setIsDeletingAccount(true);
+        try {
+          // Delete all user data
+          const [accounts, cards, transactions, cryptoHoldings, payStubs, taxDocs, goals, bills] = await Promise.all([
+            Account.filter({ created_by: user.email }),
+            CardEntity.filter({ created_by: user.email }),
+            Transaction.filter({ created_by: user.email }),
+            CryptoHolding.filter({ created_by: user.email }),
+            PayStub.filter({ created_by: user.email }),
+            TaxDocument.filter({ created_by: user.email }),
+            SavingsGoal.filter({ created_by: user.email }),
+            BillReminder.filter({ created_by: user.email })
+          ]);
+
+          // Delete all records in parallel
+          await Promise.all([
+            ...accounts.map(a => Account.delete(a.id)),
+            ...cards.map(c => CardEntity.delete(c.id)),
+            ...transactions.map(t => Transaction.delete(t.id)),
+            ...cryptoHoldings.map(h => CryptoHolding.delete(h.id)),
+            ...payStubs.map(p => PayStub.delete(p.id)),
+            ...taxDocs.map(d => TaxDocument.delete(d.id)),
+            ...goals.map(g => SavingsGoal.delete(g.id)),
+            ...bills.map(b => BillReminder.delete(b.id))
+          ]);
+
+          alert(
+            "✅ Account Deletion Completed\n\n" +
+            "Your CashFlow account and all associated data have been permanently deleted.\n\n" +
+            "Deleted items:\n" +
+            `• ${accounts.length} accounts\n` +
+            `• ${cards.length} cards\n` +
+            `• ${transactions.length} transactions\n` +
+            `• ${cryptoHoldings.length} crypto holdings\n` +
+            `• ${payStubs.length} pay stubs\n` +
+            `• ${taxDocs.length} tax documents\n` +
+            `• ${goals.length} savings goals\n` +
+            `• ${bills.length} bill reminders\n\n` +
+            "You will now be logged out.\n\n" +
+            "Thank you for using CashFlow."
+          );
+
+          // Log out user
+          await base44.auth.logout();
+        } catch (error) {
+          console.error("Error deleting account:", error);
+          alert("❌ Failed to delete account completely. Some data may remain. Please contact support.");
+        } finally {
+          setIsDeletingAccount(false);
+        }
+      } else {
+        alert("✅ Account deletion cancelled. Your account is safe and no changes were made.");
+      }
+    } else if (userInput !== null) {
+      alert("❌ Incorrect confirmation phrase.\n\nAccount deletion cancelled for your safety.\n\nYou must type exactly: DELETE MY ACCOUNT");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Privacy Overview */}
+      <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200 shadow-xl">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Shield className="w-8 h-8 text-purple-600" />
+            <div>
+              <h3 className="font-bold text-lg">Your Privacy Matters</h3>
+              <p className="text-sm text-gray-600">Control how your data is used</p>
+            </div>
+          </div>
+          <p className="text-sm text-gray-700">
+            At CashFlow, we take your privacy seriously. You have full control over your personal data,
+            including the ability to download or delete it at any time.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Data Sharing Settings */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Data Sharing & Privacy</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <Label htmlFor="share_partners" className="font-medium">Share data with partners</Label>
+              <p className="text-sm text-gray-600 max-w-md">
+                Allow us to share anonymized data with trusted partners to improve services and provide better offers.
+              </p>
+            </div>
+            <Switch
+              id="share_partners"
+              checked={privacySettings.share_data_partners}
+              onCheckedChange={(value) => handleSettingChange('share_data_partners', value)}
+            />
+          </div>
+          
+          <div className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <Label htmlFor="targeting" className="font-medium">Personalized Advertising</Label>
+              <p className="text-sm text-gray-600 max-w-md">
+                Use my activity to personalize ads and offers shown to me across CashFlow.
+              </p>
+            </div>
+            <Switch
+              id="targeting"
+              checked={privacySettings.use_for_targeting}
+              onCheckedChange={(value) => handleSettingChange('use_for_targeting', value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Management */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Manage Your Data</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-gray-600">
+            You have the right to download or request deletion of your personal data under GDPR and CCPA regulations.
+          </p>
+          
+          {/* Download Data */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold mb-2 flex items-center gap-2">
+              <Download className="w-5 h-5 text-blue-600" />
+              Download Your Data
+            </h4>
+            <p className="text-sm text-gray-700 mb-4">
+              Get a complete copy of all your CashFlow data in JSON format. Includes accounts, transactions,
+              cards, crypto holdings, pay stubs, tax documents, and more.
+            </p>
+            <Button 
+              variant="outline" 
+              className="w-full gap-2"
+              onClick={handleDownloadData}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Preparing Download...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Download Complete Data Archive
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Delete Account */}
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h4 className="font-semibold mb-2 flex items-center gap-2 text-red-800">
+              <Trash2 className="w-5 h-5" />
+              Delete Your Account
+            </h4>
+            <p className="text-sm text-gray-700 mb-4">
+              Permanently delete your CashFlow account and all associated data. This action cannot be undone.
+              We recommend downloading your data first.
+            </p>
+            <Button 
+              variant="destructive"
+              className="w-full gap-2"
+              onClick={handleRequestDeletion}
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Deleting Account...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Request Permanent Account Deletion
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Warning */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-xs text-yellow-800">
+              ⚠️ <strong>Important:</strong> Account deletion is permanent and irreversible. 
+              All your financial data, transactions, cards, and documents will be permanently erased. 
+              Make sure to download your data before proceeding if you need it for records.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Protection Notice */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>How We Protect Your Data</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-3 text-sm text-gray-700">
+            <li className="flex items-start gap-3">
+              <span className="text-green-600 font-bold">✓</span>
+              <span>All data is encrypted in transit and at rest using industry-standard AES-256 encryption</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-green-600 font-bold">✓</span>
+              <span>We never sell your personal information to third parties</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-green-600 font-bold">✓</span>
+              <span>Regular security audits and penetration testing ensure your data stays safe</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-green-600 font-bold">✓</span>
+              <span>Compliance with GDPR, CCPA, and other international data protection regulations</span>
+            </li>
+            <li className="flex items-start gap-3">
+              <span className="text-green-600 font-bold">✓</span>
+              <span>24/7 monitoring for suspicious activity and potential security threats</span>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { LogOut } from "lucide-react";
+
+export default function ProfileHeader({ user, onLogout }) {
+  return (
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex items-center gap-4">
+        <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-xl">
+          {user?.full_name?.[0] || 'U'}
+        </div>
+        <div>
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900">{user?.full_name}</h1>
+          <p className="text-gray-600 mt-1">{user?.email}</p>
+        </div>
+      </div>
+      <Button onClick={onLogout} variant="outline" className="gap-2">
+        <LogOut className="w-4 h-4" />
+        Logout
+      </Button>
+    </div>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Shield, Key, Smartphone, Lock, AlertTriangle, CheckCircle2, MapPin, Monitor, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+export default function SecuritySettings({ user, onUpdate }) {
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [mfaMethod, setMfaMethod] = useState("authenticator");
+  const [show2FASetup, setShow2FASetup] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [setupStep, setSetupStep] = useState(1);
+  const [backupCodes, setBackupCodes] = useState([]);
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
+
+  // Security Alerts Configuration
+  const [securityAlerts, setSecurityAlerts] = useState({
+    large_transaction_threshold: 1000,
+    new_device_alert: true,
+    unusual_location_alert: true,
+    failed_login_alert: true
+  });
+
+  useEffect(() => {
+    if (user?.two_factor_enabled) {
+      setTwoFactorEnabled(user.two_factor_enabled);
+    }
+    if (user?.mfa_method) {
+      setMfaMethod(user.mfa_method);
+    }
+    if (user?.security_alerts) {
+      setSecurityAlerts(user.security_alerts);
+    }
+  }, [user]);
+
+  const handle2FAToggle = (enabled) => {
+    if (enabled) {
+      setShow2FASetup(true);
+      setSetupStep(1);
+    } else {
+      if (confirm("Are you sure you want to disable MFA? This will make your account less secure.")) {
+        setTwoFactorEnabled(false);
+        onUpdate({ two_factor_enabled: false });
+      }
+    }
+  };
+
+  const generateBackupCodes = () => {
+    const codes = [];
+    for (let i = 0; i < 10; i++) {
+      const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+      codes.push(code);
+    }
+    return codes;
+  };
+
+  const handleVerify2FA = () => {
+    if (verificationCode.length === 6) {
+      const codes = generateBackupCodes();
+      setBackupCodes(codes);
+      setTwoFactorEnabled(true);
+      onUpdate({ 
+        two_factor_enabled: true,
+        mfa_method: mfaMethod,
+        backup_codes: codes
+      });
+      setShow2FASetup(false);
+      setShowBackupCodes(true);
+      alert("Multi-factor authentication enabled successfully!");
+    } else {
+      alert("Please enter a valid 6-digit code");
+    }
+  };
+
+  const handleSecurityAlertChange = (key, value) => {
+    const newAlerts = { ...securityAlerts, [key]: value };
+    setSecurityAlerts(newAlerts);
+    onUpdate({ security_alerts: newAlerts });
+  };
+
+  const downloadBackupCodes = () => {
+    const text = backupCodes.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'cashflow-backup-codes.txt';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const calculateSecurityScore = () => {
+    let score = 40; // Base score
+    if (twoFactorEnabled) score += 30;
+    if (user?.last_password_change) {
+      const daysSinceChange = Math.floor((Date.now() - new Date(user.last_password_change)) / (1000 * 60 * 60 * 24));
+      if (daysSinceChange < 90) score += 15;
+    }
+    if (securityAlerts.new_device_alert) score += 5;
+    if (securityAlerts.unusual_location_alert) score += 5;
+    if (securityAlerts.failed_login_alert) score += 5;
+    return Math.min(score, 100);
+  };
+
+  const securityScore = calculateSecurityScore();
+
+  return (
+    <div className="space-y-6">
+      {/* Security Score */}
+      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-xl">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Shield className="w-8 h-8 text-blue-600" />
+              <div>
+                <h3 className="font-bold text-lg">Security Score</h3>
+                <p className="text-sm text-gray-600">Your account security level</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-4xl font-bold text-blue-600">
+                {securityScore}/100
+              </div>
+              <Badge className={
+                securityScore >= 80 ? "bg-green-500" : 
+                securityScore >= 60 ? "bg-yellow-500" : 
+                "bg-red-500"
+              }>
+                {securityScore >= 80 ? "Excellent" : 
+                 securityScore >= 60 ? "Good" : 
+                 "Needs Improvement"}
+              </Badge>
+            </div>
+          </div>
+          {!twoFactorEnabled && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-yellow-800">
+                Enable Multi-Factor Authentication to significantly increase your security score
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Multi-Factor Authentication */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-600" />
+            Multi-Factor Authentication (MFA)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Smartphone className="w-5 h-5 text-gray-600" />
+              <div>
+                <Label htmlFor="mfa" className="font-medium">Enable MFA</Label>
+                <p className="text-sm text-gray-600">Require a second form of verification</p>
+              </div>
+            </div>
+            <Switch
+              id="mfa"
+              checked={twoFactorEnabled}
+              onCheckedChange={handle2FAToggle}
+            />
+          </div>
+          
+          {twoFactorEnabled && (
+            <>
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div className="flex-1">
+                  <p className="text-sm text-green-800 font-medium">
+                    Multi-factor authentication is active
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    Method: {mfaMethod === 'authenticator' ? 'Authenticator App' : 
+                             mfaMethod === 'sms' ? 'SMS' : 'Email'}
+                  </p>
+                </div>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setShowBackupCodes(true)}
+                >
+                  View Backup Codes
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Security Alerts Configuration */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-orange-600" />
+            Security Alerts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Configure when you want to receive security notifications
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Monitor className="w-5 h-5 text-gray-600" />
+                <div>
+                  <Label className="font-medium">New Device Login</Label>
+                  <p className="text-sm text-gray-600">Alert when logging in from a new device</p>
+                </div>
+              </div>
+              <Switch
+                checked={securityAlerts.new_device_alert}
+                onCheckedChange={(val) => handleSecurityAlertChange('new_device_alert', val)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <MapPin className="w-5 h-5 text-gray-600" />
+                <div>
+                  <Label className="font-medium">Unusual Location</Label>
+                  <p className="text-sm text-gray-600">Alert when logging in from unusual locations</p>
+                </div>
+              </div>
+              <Switch
+                checked={securityAlerts.unusual_location_alert}
+                onCheckedChange={(val) => handleSecurityAlertChange('unusual_location_alert', val)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Lock className="w-5 h-5 text-gray-600" />
+                <div>
+                  <Label className="font-medium">Failed Login Attempts</Label>
+                  <p className="text-sm text-gray-600">Alert after multiple failed login attempts</p>
+                </div>
+              </div>
+              <Switch
+                checked={securityAlerts.failed_login_alert}
+                onCheckedChange={(val) => handleSecurityAlertChange('failed_login_alert', val)}
+              />
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <Label className="font-medium">Large Transaction Alert</Label>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Get notified for transactions above this amount
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-500">$</span>
+                    <Input
+                      type="number"
+                      value={securityAlerts.large_transaction_threshold}
+                      onChange={(e) => handleSecurityAlertChange('large_transaction_threshold', parseFloat(e.target.value))}
+                      className="w-32"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Password Management */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="w-5 h-5 text-blue-600" />
+            Password Management
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-gray-600">
+            Keep your account secure by using a strong password and changing it regularly.
+          </p>
+          <div className="flex items-center gap-4">
+            <Button variant="outline">Change Password</Button>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Lock className="w-4 h-4" />
+              Last changed: {user?.last_password_change ? 
+                Math.floor((Date.now() - new Date(user.last_password_change)) / (1000 * 60 * 60 * 24)) + ' days ago' : 
+                '30 days ago'}
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm font-medium mb-2">Password Requirements</p>
+            <ul className="space-y-1 text-sm text-gray-600">
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                At least 8 characters
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                Contains uppercase and lowercase letters
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                Contains numbers
+              </li>
+              <li className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                Contains special characters
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Active Sessions & Trusted Devices */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Trusted Devices & Active Sessions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {user?.trusted_devices && user.trusted_devices.length > 0 ? (
+              user.trusted_devices.map((device, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{device.device_name || 'Unknown Device'}</p>
+                    <p className="text-sm text-gray-500">
+                      {device.browser} on {device.os} • {device.location}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Last active: {new Date(device.last_active).toLocaleString()}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm">Remove</Button>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">Current Device</p>
+                    <p className="text-sm text-gray-500">Chrome on MacOS • San Francisco, CA</p>
+                    <p className="text-xs text-gray-400 mt-1">Last active: Now</p>
+                  </div>
+                  <Badge className="bg-green-100 text-green-800">Active</Badge>
+                </div>
+              </>
+            )}
+          </div>
+          
+          <Button variant="destructive" className="w-full mt-4">
+            Sign Out All Other Devices
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Login History */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Recent Login Activity</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {user?.login_history && user.login_history.length > 0 ? (
+              user.login_history.slice(0, 5).map((login, idx) => (
+                <div key={idx} className="flex items-center justify-between py-3 border-b last:border-b-0">
+                  <div className="flex items-center gap-3">
+                    {login.is_new_device && (
+                      <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    )}
+                    <div>
+                      <p className="font-medium text-sm flex items-center gap-2">
+                        {login.status === 'success' ? 'Successful login' : 'Failed login attempt'}
+                        {login.is_new_device && (
+                          <Badge variant="outline" className="text-xs">New Device</Badge>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {login.location} • {login.browser}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {new Date(login.timestamp).toLocaleString()}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="flex items-center justify-between py-3 border-b">
+                  <div>
+                    <p className="font-medium text-sm">Successful login</p>
+                    <p className="text-xs text-gray-500">San Francisco, CA • Chrome</p>
+                  </div>
+                  <span className="text-xs text-gray-400">2 hours ago</span>
+                </div>
+                <div className="flex items-center justify-between py-3 border-b">
+                  <div>
+                    <p className="font-medium text-sm">Successful login</p>
+                    <p className="text-xs text-gray-500">San Francisco, CA • Safari iOS</p>
+                  </div>
+                  <span className="text-xs text-gray-400">Yesterday</span>
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MFA Setup Dialog */}
+      <Dialog open={show2FASetup} onOpenChange={setShow2FASetup}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enable Multi-Factor Authentication</DialogTitle>
+            <DialogDescription>
+              Add an extra layer of security to your account
+            </DialogDescription>
+          </DialogHeader>
+
+          {setupStep === 1 && (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <Label>Choose Authentication Method</Label>
+                <Select value={mfaMethod} onValueChange={setMfaMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="authenticator">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4" />
+                        Authenticator App (Recommended)
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="sms">SMS Text Message</SelectItem>
+                    <SelectItem value="email">Email Code</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {mfaMethod === 'authenticator' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-semibold mb-2">Step 1: Install Authenticator App</h4>
+                  <p className="text-sm text-gray-700">
+                    Download Google Authenticator, Authy, or Microsoft Authenticator on your phone.
+                  </p>
+                </div>
+              )}
+              
+              <Button onClick={() => setSetupStep(2)} className="w-full">
+                Continue
+              </Button>
+            </div>
+          )}
+
+          {setupStep === 2 && mfaMethod === 'authenticator' && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold mb-2">Step 2: Scan QR Code</h4>
+                <div className="bg-white p-4 rounded-lg flex items-center justify-center">
+                  <div className="w-48 h-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <p className="text-gray-500 text-center">QR Code<br/>Would appear here</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-700 mt-3">
+                  Or enter manually: <code className="bg-gray-100 px-2 py-1 rounded font-mono text-xs">
+                    ABCD-1234-EFGH-5678
+                  </code>
+                </p>
+              </div>
+              <Button onClick={() => setSetupStep(3)} className="w-full">
+                I've Scanned the Code
+              </Button>
+            </div>
+          )}
+
+          {(setupStep === 2 && mfaMethod !== 'authenticator') || setupStep === 3 ? (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold mb-2">
+                  {mfaMethod === 'authenticator' ? 'Step 3: Enter Verification Code' : 'Enter Verification Code'}
+                </h4>
+                <p className="text-sm text-gray-700 mb-4">
+                  {mfaMethod === 'authenticator' 
+                    ? 'Enter the 6-digit code from your authenticator app'
+                    : `Enter the 6-digit code sent to your ${mfaMethod}`}
+                </p>
+                <Input
+                  type="text"
+                  placeholder="000000"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                  className="text-center text-2xl tracking-widest"
+                />
+              </div>
+              <Button onClick={handleVerify2FA} className="w-full" disabled={verificationCode.length !== 6}>
+                Verify & Enable MFA
+              </Button>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Backup Codes Dialog */}
+      <Dialog open={showBackupCodes} onOpenChange={setShowBackupCodes}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Backup Recovery Codes</DialogTitle>
+            <DialogDescription>
+              Save these codes in a secure location. You can use them to access your account if you lose your device.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-yellow-800">
+                  Each code can only be used once. Store them safely - you won't be able to see them again.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-3">
+                {(user?.backup_codes || backupCodes).map((code, idx) => (
+                  <div key={idx} className="bg-white p-2 rounded border text-center font-mono text-sm">
+                    {code}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button onClick={downloadBackupCodes} variant="outline" className="flex-1">
+                Download Codes
+              </Button>
+              <Button onClick={() => setShowBackupCodes(false)} className="flex-1">
+                I've Saved Them
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

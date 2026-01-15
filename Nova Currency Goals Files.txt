@@ -1,0 +1,1415 @@
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+
+export default function CreateGoalModal({ onClose, onCreate }) {
+  const [formData, setFormData] = useState({
+    goal_name: "",
+    target_amount: "",
+    current_amount: "0",
+    target_date: null,
+    category: "other",
+    priority: "medium",
+    notes: ""
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.goal_name || !formData.target_amount || !formData.target_date) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    onCreate({
+      ...formData,
+      target_amount: parseFloat(formData.target_amount),
+      current_amount: parseFloat(formData.current_amount || 0)
+    });
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Savings Goal</DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Goal Name */}
+          <div className="space-y-2">
+            <Label htmlFor="goal_name">Goal Name *</Label>
+            <Input
+              id="goal_name"
+              placeholder="e.g., Summer Vacation"
+              value={formData.goal_name}
+              onChange={(e) => setFormData({...formData, goal_name: e.target.value})}
+            />
+          </div>
+
+          {/* Category & Priority */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="category">Category *</Label>
+              <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vacation">🏖️ Vacation</SelectItem>
+                  <SelectItem value="house">🏠 House</SelectItem>
+                  <SelectItem value="car">🚗 Car</SelectItem>
+                  <SelectItem value="emergency">🚨 Emergency Fund</SelectItem>
+                  <SelectItem value="education">🎓 Education</SelectItem>
+                  <SelectItem value="retirement">👴 Retirement</SelectItem>
+                  <SelectItem value="other">🎯 Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Amounts */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="target_amount">Target Amount * ($)</Label>
+              <Input
+                id="target_amount"
+                type="number"
+                step="0.01"
+                placeholder="5000"
+                value={formData.target_amount}
+                onChange={(e) => setFormData({...formData, target_amount: e.target.value})}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="current_amount">Current Amount ($)</Label>
+              <Input
+                id="current_amount"
+                type="number"
+                step="0.01"
+                placeholder="0"
+                value={formData.current_amount}
+                onChange={(e) => setFormData({...formData, current_amount: e.target.value})}
+              />
+            </div>
+          </div>
+
+          {/* Target Date */}
+          <div className="space-y-2">
+            <Label>Target Date *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.target_date ? format(formData.target_date, 'PPP') : 'Pick a date'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={formData.target_date}
+                  onSelect={(date) => setFormData({...formData, target_date: date})}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Add any additional details..."
+              value={formData.notes}
+              onChange={(e) => setFormData({...formData, notes: e.target.value})}
+              rows={3}
+            />
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-gradient-to-r from-green-600 to-emerald-600">
+              Create Goal
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+
+export default function CreateInvestmentGoalModal({ onClose, onSuccess, cryptoHoldings, etoroHoldings }) {
+  const [formData, setFormData] = useState({
+    goal_name: "",
+    goal_type: "retirement",
+    target_amount: "",
+    target_date: "",
+    priority: "medium",
+    monthly_contribution: "",
+    notes: ""
+  });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.goal_name || !formData.target_amount || !formData.target_date) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await base44.entities.InvestmentGoal.create({
+        ...formData,
+        target_amount: parseFloat(formData.target_amount),
+        monthly_contribution: formData.monthly_contribution ? parseFloat(formData.monthly_contribution) : 0,
+        current_amount: 0,
+        progress_percentage: 0,
+        status: "active",
+        allocated_cryptos: [],
+        allocated_stocks: []
+      });
+
+      toast.success("Investment goal created!");
+      onSuccess();
+    } catch (error) {
+      console.error("Error creating goal:", error);
+      toast.error("Failed to create goal");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Investment Goal</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          <div>
+            <Label>Goal Name *</Label>
+            <Input
+              placeholder="e.g., Retirement Fund"
+              value={formData.goal_name}
+              onChange={(e) => setFormData({ ...formData, goal_name: e.target.value })}
+              required
+            />
+          </div>
+
+          <div>
+            <Label>Goal Type *</Label>
+            <Select value={formData.goal_type} onValueChange={(value) => setFormData({ ...formData, goal_type: value })}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="retirement">Retirement</SelectItem>
+                <SelectItem value="down_payment">Down Payment</SelectItem>
+                <SelectItem value="education">Education</SelectItem>
+                <SelectItem value="vacation">Vacation</SelectItem>
+                <SelectItem value="emergency_fund">Emergency Fund</SelectItem>
+                <SelectItem value="wealth_building">Wealth Building</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Target Amount * ($)</Label>
+              <Input
+                type="number"
+                placeholder="50000"
+                value={formData.target_amount}
+                onChange={(e) => setFormData({ ...formData, target_amount: e.target.value })}
+                required
+              />
+            </div>
+
+            <div>
+              <Label>Target Date *</Label>
+              <Input
+                type="date"
+                value={formData.target_date}
+                onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Priority</Label>
+              <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Monthly Contribution ($)</Label>
+              <Input
+                type="number"
+                placeholder="500"
+                value={formData.monthly_contribution}
+                onChange={(e) => setFormData({ ...formData, monthly_contribution: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <Textarea
+              placeholder="Add any additional notes about this goal..."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? "Creating..." : "Create Goal"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Minus, Trash2, Check } from "lucide-react";
+import { format } from "date-fns";
+
+export default function GoalDetails({ goal, onClose, onUpdate, onDelete }) {
+  const [addAmount, setAddAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+
+  const progress = (goal.current_amount || 0) / goal.target_amount * 100;
+  const remaining = goal.target_amount - (goal.current_amount || 0);
+  const daysLeft = Math.ceil((new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24));
+
+  const handleAddFunds = async () => {
+    if (!addAmount || isNaN(addAmount)) return;
+    const newAmount = (goal.current_amount || 0) + parseFloat(addAmount);
+    await onUpdate(goal.id, { 
+      current_amount: newAmount,
+      status: newAmount >= goal.target_amount ? 'completed' : goal.status
+    });
+    setAddAmount("");
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || isNaN(withdrawAmount)) return;
+    const newAmount = Math.max(0, (goal.current_amount || 0) - parseFloat(withdrawAmount));
+    await onUpdate(goal.id, { 
+      current_amount: newAmount,
+      status: 'active'
+    });
+    setWithdrawAmount("");
+  };
+
+  const handleMarkComplete = async () => {
+    await onUpdate(goal.id, { status: 'completed' });
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>{goal.goal_name}</span>
+            <Badge variant={goal.status === 'completed' ? 'default' : 'secondary'} className="capitalize">
+              {goal.status}
+            </Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Progress Section */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm text-gray-600">Progress</span>
+              <span className="text-2xl font-bold text-green-700">{progress.toFixed(0)}%</span>
+            </div>
+            <Progress value={progress} className="h-3 mb-4" />
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <p className="text-sm text-gray-600">Current</p>
+                <p className="text-2xl font-bold text-gray-900">${(goal.current_amount || 0).toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Target</p>
+                <p className="text-2xl font-bold text-gray-900">${goal.target_amount.toFixed(2)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Remaining</p>
+              <p className="text-xl font-bold text-gray-900">${remaining.toFixed(2)}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Days Left</p>
+              <p className="text-xl font-bold text-gray-900">{daysLeft > 0 ? daysLeft : 'Overdue'}</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Target Date</p>
+              <p className="text-sm font-bold text-gray-900">{format(new Date(goal.target_date), 'MMM d, yyyy')}</p>
+            </div>
+          </div>
+
+          {/* Add/Withdraw Funds */}
+          {goal.status !== 'completed' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Add Funds</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount"
+                    value={addAmount}
+                    onChange={(e) => setAddAmount(e.target.value)}
+                  />
+                  <Button onClick={handleAddFunds} className="bg-green-600 hover:bg-green-700">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Withdraw</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Amount"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                  />
+                  <Button onClick={handleWithdraw} variant="outline">
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {goal.notes && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-600 mb-2">Notes</p>
+              <p className="text-gray-900">{goal.notes}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 justify-between pt-4 border-t">
+            <Button
+              variant="destructive"
+              onClick={() => onDelete(goal.id)}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Goal
+            </Button>
+            
+            {goal.status !== 'completed' && (
+              <Button
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleMarkComplete}
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Mark as Completed
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sparkles, Plus, Trash2, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
+
+export default function GoalDetailsModal({ goal, onClose, onUpdate, cryptoHoldings, etoroHoldings }) {
+  const [aiRecommendations, setAiRecommendations] = useState(goal.ai_recommendations || []);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [selectedCryptos, setSelectedCryptos] = useState(goal.allocated_cryptos || []);
+  const [selectedStocks, setSelectedStocks] = useState(goal.allocated_stocks || []);
+
+  const calculateCurrentValue = () => {
+    let value = 0;
+    
+    selectedCryptos.forEach(allocation => {
+      const holding = cryptoHoldings.find(h => h.crypto_symbol === allocation.symbol);
+      if (holding) value += holding.current_value || 0;
+    });
+
+    selectedStocks.forEach(allocation => {
+      const holding = etoroHoldings.find(h => h.symbol === allocation.symbol);
+      if (holding) value += holding.total_value || 0;
+    });
+
+    return value;
+  };
+
+  const progress = (calculateCurrentValue() / goal.target_amount) * 100;
+
+  const generateAIRecommendations = async () => {
+    setLoadingAI(true);
+    try {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `As a financial advisor AI, analyze this investment goal and provide actionable recommendations:
+
+Goal Details:
+- Name: ${goal.goal_name}
+- Type: ${goal.goal_type}
+- Target Amount: $${goal.target_amount}
+- Current Progress: ${progress.toFixed(1)}%
+- Target Date: ${goal.target_date}
+- Days Remaining: ${Math.ceil((new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24))}
+- Monthly Contribution: $${goal.monthly_contribution || 0}
+
+Current Allocations:
+- Cryptocurrencies: ${selectedCryptos.map(c => c.symbol).join(', ') || 'None'}
+- Stocks: ${selectedStocks.map(s => s.symbol).join(', ') || 'None'}
+
+Provide 5 specific, actionable recommendations to help achieve this goal faster. Consider:
+1. Portfolio diversification
+2. Monthly contribution adjustments
+3. Asset rebalancing opportunities
+4. Risk management
+5. Time-based strategies
+
+Format as JSON array of strings.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            recommendations: {
+              type: "array",
+              items: { type: "string" }
+            }
+          }
+        }
+      });
+
+      const recommendations = response.recommendations || [];
+      setAiRecommendations(recommendations);
+
+      // Update goal with recommendations
+      await base44.entities.InvestmentGoal.update(goal.id, {
+        ai_recommendations: recommendations
+      });
+
+      toast.success("AI recommendations generated!");
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      toast.error("Failed to generate recommendations");
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const allocateCrypto = async (symbol) => {
+    const holding = cryptoHoldings.find(h => h.crypto_symbol === symbol);
+    if (!holding) return;
+
+    const newAllocation = {
+      symbol: holding.crypto_symbol,
+      quantity: holding.quantity,
+      value_usd: holding.current_value
+    };
+
+    const updated = [...selectedCryptos, newAllocation];
+    setSelectedCryptos(updated);
+
+    try {
+      await base44.entities.InvestmentGoal.update(goal.id, {
+        allocated_cryptos: updated
+      });
+      toast.success(`${symbol} allocated to goal`);
+    } catch (error) {
+      console.error("Error allocating crypto:", error);
+      toast.error("Failed to allocate");
+    }
+  };
+
+  const allocateStock = async (symbol) => {
+    const holding = etoroHoldings.find(h => h.symbol === symbol);
+    if (!holding) return;
+
+    const newAllocation = {
+      symbol: holding.symbol,
+      quantity: holding.quantity,
+      value_usd: holding.total_value
+    };
+
+    const updated = [...selectedStocks, newAllocation];
+    setSelectedStocks(updated);
+
+    try {
+      await base44.entities.InvestmentGoal.update(goal.id, {
+        allocated_stocks: updated
+      });
+      toast.success(`${symbol} allocated to goal`);
+    } catch (error) {
+      console.error("Error allocating stock:", error);
+      toast.error("Failed to allocate");
+    }
+  };
+
+  const removeAllocation = async (symbol, type) => {
+    if (type === 'crypto') {
+      const updated = selectedCryptos.filter(c => c.symbol !== symbol);
+      setSelectedCryptos(updated);
+      await base44.entities.InvestmentGoal.update(goal.id, { allocated_cryptos: updated });
+    } else {
+      const updated = selectedStocks.filter(s => s.symbol !== symbol);
+      setSelectedStocks(updated);
+      await base44.entities.InvestmentGoal.update(goal.id, { allocated_stocks: updated });
+    }
+    toast.success("Allocation removed");
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>{goal.goal_name}</span>
+            <Badge>{goal.status}</Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6 mt-4">
+          {/* Progress Overview */}
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-gray-600">Progress</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${calculateCurrentValue().toLocaleString()}
+              </p>
+            </div>
+            <Progress value={progress} className="mb-2" />
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">{progress.toFixed(1)}% Complete</span>
+              <span className="text-green-600">
+                Target: ${goal.target_amount.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          <Tabs defaultValue="allocations">
+            <TabsList className="w-full">
+              <TabsTrigger value="allocations" className="flex-1">Allocations</TabsTrigger>
+              <TabsTrigger value="recommendations" className="flex-1">AI Insights</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="allocations" className="space-y-4">
+              {/* Crypto Allocations */}
+              <div>
+                <Label className="mb-2 block">Allocated Cryptocurrencies</Label>
+                <div className="space-y-2">
+                  {selectedCryptos.map((allocation) => (
+                    <div key={allocation.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-semibold">{allocation.symbol}</p>
+                        <p className="text-sm text-gray-600">
+                          {allocation.quantity} units • ${allocation.value_usd?.toLocaleString()}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeAllocation(allocation.symbol, 'crypto')}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {cryptoHoldings.filter(h => !selectedCryptos.find(c => c.symbol === h.crypto_symbol)).length > 0 && (
+                    <div className="pt-2">
+                      <Label className="text-xs text-gray-600">Available to allocate:</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {cryptoHoldings
+                          .filter(h => !selectedCryptos.find(c => c.symbol === h.crypto_symbol))
+                          .map((holding) => (
+                            <Button
+                              key={holding.crypto_symbol}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => allocateCrypto(holding.crypto_symbol)}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              {holding.crypto_symbol}
+                            </Button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Stock Allocations */}
+              <div>
+                <Label className="mb-2 block">Allocated Stocks</Label>
+                <div className="space-y-2">
+                  {selectedStocks.map((allocation) => (
+                    <div key={allocation.symbol} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-semibold">{allocation.symbol}</p>
+                        <p className="text-sm text-gray-600">
+                          {allocation.quantity} shares • ${allocation.value_usd?.toLocaleString()}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeAllocation(allocation.symbol, 'stock')}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {etoroHoldings.filter(h => !selectedStocks.find(s => s.symbol === h.symbol)).length > 0 && (
+                    <div className="pt-2">
+                      <Label className="text-xs text-gray-600">Available to allocate:</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {etoroHoldings
+                          .filter(h => !selectedStocks.find(s => s.symbol === h.symbol))
+                          .map((holding) => (
+                            <Button
+                              key={holding.symbol}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => allocateStock(holding.symbol)}
+                            >
+                              <Plus className="w-3 h-3 mr-1" />
+                              {holding.symbol}
+                            </Button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="recommendations" className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>AI-Powered Recommendations</Label>
+                <Button size="sm" onClick={generateAIRecommendations} disabled={loadingAI}>
+                  <Sparkles className={`w-4 h-4 mr-2 ${loadingAI ? 'animate-spin' : ''}`} />
+                  {loadingAI ? "Generating..." : "Get New Insights"}
+                </Button>
+              </div>
+
+              {aiRecommendations.length === 0 ? (
+                <div className="text-center py-8">
+                  <Sparkles className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 mb-4">No recommendations yet</p>
+                  <Button onClick={generateAIRecommendations} disabled={loadingAI}>
+                    Generate AI Recommendations
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {aiRecommendations.map((recommendation, index) => (
+                    <div key={index} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="flex items-start gap-3">
+                        <TrendingUp className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-purple-900">{recommendation}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <Button onClick={onClose} className="w-full">
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Loader2, Target, DollarSign, TrendingUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+export default function GoalRecommendations({ account, goals, user, transactions }) {
+  const [recommendations, setRecommendations] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [overallAdvice, setOverallAdvice] = useState(null);
+
+  const analyzeGoals = async () => {
+    setIsAnalyzing(true);
+    setRecommendations(null);
+    setOverallAdvice(null);
+
+    try {
+      const safeTransactions = Array.isArray(transactions) ? transactions : [];
+
+      const last30Days = safeTransactions.filter(t => {
+        const txDate = new Date(t.created_date);
+        const daysAgo = (Date.now() - txDate.getTime()) / (1000 * 60 * 60 * 24);
+        return daysAgo <= 30;
+      });
+
+      const monthlyIncome = last30Days
+        .filter(t => ['credit', 'transfer_in'].includes(t.type))
+        .reduce((sum, t) => sum + t.amount, 0);
+
+      const monthlyExpenses = last30Days
+        .filter(t => ['debit', 'transfer_out'].includes(t.type))
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+      const currentSavings = account?.balance || 0;
+      const existingGoalsCount = goals.length;
+
+      const prompt = `You are a financial advisor helping someone set realistic savings goals.
+
+USER'S FINANCIAL SITUATION:
+- Monthly Income: $${monthlyIncome.toFixed(2)}
+- Monthly Expenses: $${monthlyExpenses.toFixed(2)}
+- Current Savings: $${currentSavings.toFixed(2)}
+- Existing Goals: ${existingGoalsCount}
+
+Based on their finances, recommend 3-5 specific, achievable savings goals they should consider.
+
+For each recommended goal:
+- goal_name: specific name (e.g., "Emergency Fund", "Hawaii Vacation")
+- target_amount: realistic dollar amount
+- suggested_monthly_contribution: what they can afford monthly
+- priority: high/medium/low
+- timeframe_months: how many months to reach goal
+- reasoning: why this goal matters
+- category: emergency/vacation/house/car/education/retirement/other
+
+Also provide overall_advice: general strategy for their situation.
+
+Be realistic about what they can afford based on their income minus expenses.`;
+
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: prompt,
+        add_context_from_internet: false,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            recommendations: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  goal_name: { type: "string" },
+                  target_amount: { type: "number" },
+                  suggested_monthly_contribution: { type: "number" },
+                  priority: { type: "string" },
+                  timeframe_months: { type: "number" },
+                  reasoning: { type: "string" },
+                  category: { type: "string" }
+                }
+              }
+            },
+            overall_advice: { type: "string" }
+          }
+        }
+      });
+
+      setRecommendations(response.recommendations);
+      setOverallAdvice(response.overall_advice);
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      alert("Failed to generate recommendations. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  return (
+    <Card className="bg-gradient-to-br from-purple-50 via-pink-50 to-orange-50 border-purple-200 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-600" />
+          AI Goal Recommendations
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {(!recommendations && !overallAdvice) ? (
+          <>
+            <p className="text-sm text-gray-600">
+              Get personalized recommendations for new savings goals based on your financial situation.
+            </p>
+            <Button
+              onClick={analyzeGoals}
+              disabled={isAnalyzing || !transactions || transactions.length === 0}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating Recommendations...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate New Goal Ideas
+                </>
+              )}
+            </Button>
+            {(!transactions || transactions.length === 0) && (
+              <p className="text-xs text-gray-500 text-center">
+                Add some transactions first to get personalized recommendations
+              </p>
+            )}
+          </>
+        ) : (
+          <div className="space-y-4">
+            {overallAdvice && (
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="font-semibold mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Overall Savings Strategy
+                </h3>
+                <p className="text-sm text-gray-700">{overallAdvice}</p>
+              </div>
+            )}
+
+            {recommendations && recommendations.length > 0 && (
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Suggested Savings Goals
+                </h3>
+                <div className="space-y-3">
+                  {recommendations.map((goal, idx) => (
+                    <div key={idx} className="border-b pb-3 last:border-b-0 last:pb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-semibold text-purple-700">{goal.goal_name}</p>
+                        <Badge className={
+                          goal.priority === 'high' ? 'bg-red-100 text-red-700' :
+                          goal.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-green-100 text-green-700'
+                        }>
+                          {goal.priority} priority
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-700 mb-2">{goal.reasoning}</p>
+                      <div className="grid grid-cols-2 gap-y-1 text-xs text-gray-600">
+                        <p className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3 text-gray-500" />
+                          <span className="font-medium">Target:</span> ${goal.target_amount?.toFixed(2)}
+                        </p>
+                        <p>
+                          <span className="font-medium">Category:</span> {goal.category}
+                        </p>
+                        <p className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3 text-gray-500" />
+                          <span className="font-medium">Monthly:</span> ${goal.suggested_monthly_contribution?.toFixed(2)}
+                        </p>
+                        <p>
+                          <span className="font-medium">Timeframe:</span> {goal.timeframe_months} months
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button
+              onClick={() => {
+                setRecommendations(null);
+                setOverallAdvice(null);
+              }}
+              variant="outline"
+              className="w-full"
+            >
+              Generate New Recommendations
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Target, Calendar, DollarSign, Plus } from "lucide-react";
+import { format } from "date-fns";
+
+const CATEGORY_ICONS = {
+  vacation: "🏖️",
+  house: "🏠",
+  car: "🚗",
+  emergency: "🚨",
+  education: "🎓",
+  retirement: "👴",
+  other: "🎯"
+};
+
+const CATEGORY_COLORS = {
+  vacation: "from-blue-500 to-cyan-500",
+  house: "from-green-500 to-emerald-500",
+  car: "from-red-500 to-orange-500",
+  emergency: "from-yellow-500 to-amber-500",
+  education: "from-purple-500 to-pink-500",
+  retirement: "from-indigo-500 to-blue-500",
+  other: "from-gray-500 to-slate-500"
+};
+
+export default function GoalsList({ goals, onGoalClick, onUpdateGoal }) {
+  const handleAddFunds = async (goal, amount) => {
+    const newAmount = (goal.current_amount || 0) + amount;
+    const updates = { 
+      current_amount: newAmount,
+      status: newAmount >= goal.target_amount ? 'completed' : goal.status
+    };
+    await onUpdateGoal(goal.id, updates);
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {goals.map((goal) => {
+        const progress = (goal.current_amount || 0) / goal.target_amount * 100;
+        const daysLeft = Math.ceil((new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24));
+        const isOverdue = daysLeft < 0;
+        const isNearDeadline = daysLeft <= 30 && daysLeft > 0;
+
+        return (
+          <Card 
+            key={goal.id}
+            className="bg-white/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all cursor-pointer group"
+            onClick={() => onGoalClick(goal)}
+          >
+            <CardContent className="p-6">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 bg-gradient-to-r ${CATEGORY_COLORS[goal.category]} rounded-full flex items-center justify-center text-2xl`}>
+                    {CATEGORY_ICONS[goal.category]}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900">{goal.goal_name}</h3>
+                    <p className="text-sm text-gray-500 capitalize">{goal.category}</p>
+                  </div>
+                </div>
+                <Badge variant={goal.priority === 'high' ? 'destructive' : 'secondary'} className="capitalize">
+                  {goal.priority}
+                </Badge>
+              </div>
+
+              {/* Progress */}
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Progress</span>
+                  <span className="text-sm font-bold">{progress.toFixed(0)}%</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">${(goal.current_amount || 0).toFixed(0)}</span>
+                  <span className="font-bold text-gray-900">${goal.target_amount.toFixed(0)}</span>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span className={isOverdue ? 'text-red-600 font-medium' : isNearDeadline ? 'text-orange-600' : 'text-gray-600'}>
+                    {isOverdue ? 'Overdue' : `${daysLeft} days left`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <DollarSign className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-600">
+                    ${(goal.target_amount - (goal.current_amount || 0)).toFixed(0)} to go
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Add Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full group-hover:bg-green-50 group-hover:border-green-500 group-hover:text-green-700 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const amount = prompt("How much would you like to add?");
+                  if (amount && !isNaN(amount)) {
+                    handleAddFunds(goal, parseFloat(amount));
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Funds
+              </Button>
+
+              {/* Target Date */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  Target: {format(new Date(goal.target_date), 'MMM d, yyyy')}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Target, TrendingUp, Plus, Edit2, Trash2, Sparkles } from "lucide-react";
+import CreateInvestmentGoalModal from "./CreateInvestmentGoalModal";
+import GoalDetailsModal from "./GoalDetailsModal";
+
+export default function InvestmentGoalTracker() {
+  const [goals, setGoals] = useState([]);
+  const [cryptoHoldings, setCryptoHoldings] = useState([]);
+  const [etoroHoldings, setEtoroHoldings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedGoal, setSelectedGoal] = useState(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const user = await base44.auth.me();
+      
+      const [goalsData, cryptoData, etoroData] = await Promise.all([
+        base44.entities.InvestmentGoal.filter({ created_by: user.email }),
+        base44.entities.CryptoHolding.filter({ created_by: user.email }),
+        base44.entities.EToroHolding.filter({ created_by: user.email })
+      ]);
+
+      setGoals(goalsData);
+      setCryptoHoldings(cryptoData);
+      setEtoroHoldings(etoroData);
+    } catch (error) {
+      console.error("Error loading investment goals:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateProgress = (goal) => {
+    let currentValue = 0;
+
+    // Calculate value from allocated cryptos
+    if (goal.allocated_cryptos && goal.allocated_cryptos.length > 0) {
+      goal.allocated_cryptos.forEach(allocation => {
+        const holding = cryptoHoldings.find(h => h.crypto_symbol === allocation.symbol);
+        if (holding) {
+          currentValue += holding.current_value || 0;
+        }
+      });
+    }
+
+    // Calculate value from allocated stocks
+    if (goal.allocated_stocks && goal.allocated_stocks.length > 0) {
+      goal.allocated_stocks.forEach(allocation => {
+        const holding = etoroHoldings.find(h => h.symbol === allocation.symbol);
+        if (holding) {
+          currentValue += holding.total_value || 0;
+        }
+      });
+    }
+
+    const progress = (currentValue / goal.target_amount) * 100;
+    return { currentValue, progress: Math.min(progress, 100) };
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case "critical": return "bg-red-600";
+      case "high": return "bg-orange-600";
+      case "medium": return "bg-yellow-600";
+      case "low": return "bg-green-600";
+      default: return "bg-gray-600";
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "completed": return "bg-green-600";
+      case "active": return "bg-blue-600";
+      case "paused": return "bg-gray-600";
+      default: return "bg-gray-600";
+    }
+  };
+
+  const deleteGoal = async (goalId) => {
+    if (!confirm("Are you sure you want to delete this goal?")) return;
+    
+    try {
+      await base44.entities.InvestmentGoal.delete(goalId);
+      setGoals(goals.filter(g => g.id !== goalId));
+    } catch (error) {
+      console.error("Error deleting goal:", error);
+    }
+  };
+
+  const totalTargetAmount = goals.reduce((sum, g) => sum + (g.target_amount || 0), 0);
+  const totalCurrentAmount = goals.reduce((sum, g) => {
+    const { currentValue } = calculateProgress(g);
+    return sum + currentValue;
+  }, 0);
+  const overallProgress = totalTargetAmount > 0 ? (totalCurrentAmount / totalTargetAmount) * 100 : 0;
+
+  return (
+    <>
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Target className="w-6 h-6 text-blue-600" />
+              Investment Goals
+            </CardTitle>
+            <Button onClick={() => setShowCreateModal(true)} size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              New Goal
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Overall Progress */}
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm text-gray-600">Total Goals Progress</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${totalCurrentAmount.toLocaleString()}
+              </p>
+            </div>
+            <Progress value={overallProgress} className="mb-2" />
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">
+                {goals.length} {goals.length === 1 ? 'goal' : 'goals'} active
+              </span>
+              <span className="text-green-600">
+                Target: ${totalTargetAmount.toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Individual Goals */}
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : goals.length === 0 ? (
+            <div className="text-center py-8">
+              <Target className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-600 mb-4">No investment goals yet</p>
+              <Button onClick={() => setShowCreateModal(true)} size="sm">
+                Create Your First Goal
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {goals.map((goal) => {
+                const { currentValue, progress } = calculateProgress(goal);
+                const daysRemaining = Math.ceil(
+                  (new Date(goal.target_date) - new Date()) / (1000 * 60 * 60 * 24)
+                );
+
+                return (
+                  <div
+                    key={goal.id}
+                    className="p-4 rounded-lg border bg-white hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => setSelectedGoal(goal)}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-gray-900">{goal.goal_name}</h4>
+                          <Badge className={getPriorityColor(goal.priority)}>
+                            {goal.priority}
+                          </Badge>
+                          <Badge className={getStatusColor(goal.status)}>
+                            {goal.status}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-600 capitalize">{goal.goal_type.replace('_', ' ')}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGoal(goal);
+                          }}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteGoal(goal.id);
+                          }}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Progress value={progress} className="mb-2" />
+                    
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-600">
+                        ${currentValue.toLocaleString()} / ${goal.target_amount.toLocaleString()}
+                      </span>
+                      <span className="font-semibold text-blue-600">
+                        {progress.toFixed(1)}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{daysRemaining} days remaining</span>
+                      {goal.monthly_contribution > 0 && (
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          ${goal.monthly_contribution}/mo
+                        </span>
+                      )}
+                    </div>
+
+                    {goal.ai_recommendations && goal.ai_recommendations.length > 0 && (
+                      <div className="mt-3 p-2 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="flex items-start gap-2">
+                          <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-purple-800">
+                            {goal.ai_recommendations[0]}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {showCreateModal && (
+        <CreateInvestmentGoalModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            loadData();
+            setShowCreateModal(false);
+          }}
+          cryptoHoldings={cryptoHoldings}
+          etoroHoldings={etoroHoldings}
+        />
+      )}
+
+      {selectedGoal && (
+        <GoalDetailsModal
+          goal={selectedGoal}
+          onClose={() => setSelectedGoal(null)}
+          onUpdate={() => {
+            loadData();
+            setSelectedGoal(null);
+          }}
+          cryptoHoldings={cryptoHoldings}
+          etoroHoldings={etoroHoldings}
+        />
+      )}
+    </>
+  );
+}

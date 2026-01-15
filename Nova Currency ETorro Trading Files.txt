@@ -1,0 +1,1160 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, RefreshCw, AlertCircle, TrendingUp, Target } from "lucide-react";
+
+export default function AITradingRecommendations({ holdings, trades, watchlist }) {
+  const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    generateRecommendations();
+  }, [holdings, trades]);
+
+  const generateRecommendations = async () => {
+    setLoading(true);
+    try {
+      const portfolioValue = holdings.reduce((sum, h) => sum + (h.total_value || 0), 0);
+      const totalPL = holdings.reduce((sum, h) => sum + (h.profit_loss || 0), 0);
+      
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `As an AI trading analyst, analyze this trading portfolio and provide recommendations:
+
+Portfolio Summary:
+- Total Value: $${portfolioValue.toFixed(2)}
+- Total P/L: $${totalPL.toFixed(2)}
+- Holdings: ${holdings.length}
+- Total Trades: ${trades.length}
+
+Current Holdings:
+${holdings.map(h => `- ${h.asset_name} (${h.symbol}): ${h.quantity} shares @ $${h.current_price} (P/L: ${h.profit_loss_percent?.toFixed(2)}%)`).join('\n')}
+
+Recent Trades:
+${trades.slice(0, 5).map(t => `- ${t.trade_type.toUpperCase()} ${t.quantity} ${t.symbol} @ $${t.price}`).join('\n')}
+
+Watchlist: ${watchlist.map(w => w.symbol).join(', ')}
+
+Provide 5 strategic recommendations:
+{
+  "recommendations": [
+    {
+      "title": "Recommendation title",
+      "description": "Detailed analysis (2-3 sentences)",
+      "type": "opportunity|risk|diversification|technical|fundamental",
+      "action": "buy|sell|hold|rebalance",
+      "priority": "high|medium|low",
+      "symbols": ["AAPL", "TSLA"],
+      "reasoning": "Why this recommendation matters"
+    }
+  ]
+}
+
+Focus on:
+1. Portfolio balance and diversification
+2. Risk management
+3. Profit-taking opportunities
+4. Position sizing
+5. Market trends and momentum`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            recommendations: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  type: { type: "string" },
+                  action: { type: "string" },
+                  priority: { type: "string" },
+                  symbols: { type: "array", items: { type: "string" } },
+                  reasoning: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setRecommendations(response.recommendations || []);
+    } catch (error) {
+      console.error("Error generating recommendations:", error);
+      setRecommendations([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getTypeColor = (type) => {
+    switch (type?.toLowerCase()) {
+      case 'opportunity': return 'bg-green-100 text-green-800';
+      case 'risk': return 'bg-red-100 text-red-800';
+      case 'diversification': return 'bg-blue-100 text-blue-800';
+      case 'technical': return 'bg-purple-100 text-purple-800';
+      case 'fundamental': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityBadge = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case 'high': return 'bg-red-600 text-white';
+      case 'medium': return 'bg-yellow-500 text-white';
+      case 'low': return 'bg-green-500 text-white';
+      default: return 'bg-gray-400 text-white';
+    }
+  };
+
+  const getActionIcon = (action) => {
+    switch (action?.toLowerCase()) {
+      case 'buy': return <TrendingUp className="w-4 h-4 text-green-600" />;
+      case 'sell': return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case 'hold': return <Target className="w-4 h-4 text-blue-600" />;
+      default: return <Target className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+            AI Trading Recommendations
+          </CardTitle>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={generateRecommendations}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-3"></div>
+              <p className="text-sm text-gray-600">Analyzing your portfolio...</p>
+            </div>
+          </div>
+        ) : recommendations.length === 0 ? (
+          <div className="text-center py-8">
+            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">No recommendations available</p>
+            <Button onClick={generateRecommendations} className="mt-4" size="sm">
+              Generate Recommendations
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {recommendations.map((rec, index) => (
+              <div key={index} className="p-4 rounded-lg border bg-gradient-to-r from-white to-purple-50">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {getActionIcon(rec.action)}
+                    <h4 className="font-semibold text-gray-900">{rec.title}</h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={getPriorityBadge(rec.priority)}>
+                      {rec.priority}
+                    </Badge>
+                    <Badge className={getTypeColor(rec.type)}>
+                      {rec.type}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-700 mb-3">{rec.description}</p>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {rec.symbols?.map((symbol, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {symbol}
+                      </Badge>
+                    ))}
+                  </div>
+                  <Badge variant="outline" className="capitalize">
+                    {rec.action}
+                  </Badge>
+                </div>
+                
+                <p className="text-xs text-gray-600 mt-2 italic">{rec.reasoning}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-yellow-800">
+              <strong>DEMO MODE:</strong> These are AI-generated recommendations for educational purposes only. 
+              This is not financial advice. All trades are simulated with no real money.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+export default function EToroHistory({ trades }) {
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="w-6 h-6 text-blue-600" />
+          Trade History
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {trades.length > 0 ? (
+          <div className="space-y-3">
+            {trades.map((trade) => (
+              <div key={trade.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    trade.trade_type === 'buy' ? 'bg-green-100' : 'bg-red-100'
+                  }`}>
+                    {trade.trade_type === 'buy' ? 
+                      <TrendingUp className="w-6 h-6 text-green-600" /> :
+                      <TrendingDown className="w-6 h-6 text-red-600" />
+                    }
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold">{trade.asset_name}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {trade.symbol}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {format(new Date(trade.created_date), 'MMM d, yyyy h:mm a')}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <p className="font-medium">
+                    {trade.quantity} @ ${trade.price.toFixed(2)}
+                  </p>
+                  <p className={`text-lg font-bold ${
+                    trade.trade_type === 'buy' ? 'text-red-600' : 'text-green-600'
+                  }`}>
+                    {trade.trade_type === 'buy' ? '-' : '+'}${trade.total_amount.toFixed(2)}
+                  </p>
+                </div>
+
+                <Badge variant={
+                  trade.status === 'executed' ? 'default' :
+                  trade.status === 'pending' ? 'secondary' :
+                  'destructive'
+                }>
+                  {trade.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No trade history yet</p>
+            <p className="text-sm text-gray-500 mt-2">Your trades will appear here</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Search, TrendingUp, TrendingDown, Star, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+
+export default function EToroMarket({ watchlist, onAddToWatchlist, onTrade, onSelectChart }) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeCategory, setActiveCategory] = useState("stocks");
+  const [assets, setAssets] = useState({ stocks: [], crypto: [], commodities: [] });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadRealMarketPrices();
+  }, []);
+
+  const loadRealMarketPrices = async () => {
+    setIsLoading(true);
+    try {
+      const stockData = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a financial data API. Get CURRENT real stock prices RIGHT NOW from Yahoo Finance or Google Finance as of ${new Date().toISOString()}.
+
+Return data for: AAPL, TSLA, GOOGL, MSFT, AMZN, NVDA, META, NFLX
+
+For EACH stock provide ALL these fields with valid numbers:
+- symbol: ticker
+- name: company name
+- price: actual current price (MUST be a number, not null)
+- change: today's dollar change (MUST be a number, can be negative)
+- change_percent: today's percent change (MUST be a number, can be negative)
+- volume: trading volume (MUST be a number)
+
+CRITICAL: Every field must have a valid number. No null values. This data will be shown to users - it MUST be factually accurate current prices.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            stocks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  symbol: { type: "string" },
+                  name: { type: "string" },
+                  price: { type: "number" },
+                  change: { type: "number" }, // Dollar change
+                  change_percent: { type: "number" }, // Percent change
+                  volume: { type: "number" }
+                },
+                required: ["symbol", "name", "price", "change", "change_percent", "volume"]
+              }
+            }
+          }
+        }
+      });
+
+      const cryptoData = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a financial data API. Search the internet RIGHT NOW and get EXACT CURRENT cryptocurrency prices as of ${new Date().toISOString()}.
+
+I need FACTUAL, REAL, ACTUAL market data for:
+- BTC (Bitcoin)
+- ETH (Ethereum)
+- BNB (Binance Coin)
+- SOL (Solana)
+
+Search CoinMarketCap, CoinGecko, or live market data sources.
+
+Return the ACTUAL CURRENT prices as they are RIGHT NOW.
+
+For each crypto provide:
+- symbol: ticker
+- name: full name
+- price: ACTUAL current USD price (not example/fake data)
+- change: ACTUAL 24h percentage change
+
+This data will be shown to users - it MUST be factually accurate current prices.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            crypto: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  symbol: { type: "string" },
+                  name: { type: "string" },
+                  price: { type: "number" },
+                  change: { type: "number" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const commodityData = await base44.integrations.Core.InvokeLLM({
+        prompt: `You are a financial data API. Search the internet RIGHT NOW and get EXACT CURRENT commodity prices as of ${new Date().toISOString()}.
+
+I need FACTUAL, REAL, ACTUAL market data for:
+- Gold (spot price per ounce)
+- Crude Oil (WTI per barrel)
+- Silver (spot price per ounce)
+
+Search commodity market data sources.
+
+Return the ACTUAL CURRENT prices as they are RIGHT NOW.
+
+For each provide:
+- symbol: "GOLD", "OIL", "SILVER"
+- name: full name
+- price: ACTUAL current USD price (not example/fake data)
+- change: ACTUAL 24h percentage change
+
+This data will be shown to users - it MUST be factually accurate current prices.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            commodities: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  symbol: { type: "string" },
+                  name: { type: "string" },
+                  price: { type: "number" },
+                  change: { type: "number" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Validate and map stock data
+      const stocks = (stockData.stocks || [])
+        .filter(s => 
+          s.symbol && s.name && 
+          typeof s.price === 'number' && s.price > 0 &&
+          typeof s.change === 'number' && // dollar change
+          typeof s.change_percent === 'number' && // percent change
+          typeof s.volume === 'number' // volume
+        )
+        .map(s => ({ 
+          ...s, 
+          change: s.change_percent, // Use change_percent for the UI's 'change' field (which expects percentage)
+          type: 'stock' 
+        }));
+
+      // Validate and map crypto data
+      const crypto = (cryptoData.crypto || [])
+        .filter(c =>
+          c.symbol && c.name &&
+          typeof c.price === 'number' && c.price > 0 &&
+          typeof c.change === 'number' // 24h percentage change
+        )
+        .map(c => ({ ...c, type: 'crypto' }));
+
+      // Validate and map commodities data
+      const commodities = (commodityData.commodities || [])
+        .filter(c =>
+          c.symbol && c.name &&
+          typeof c.price === 'number' && c.price > 0 &&
+          typeof c.change === 'number' // 24h percentage change
+        )
+        .map(c => ({ ...c, type: 'commodity' }));
+
+      setAssets({ stocks, crypto, commodities });
+
+    } catch (error) {
+      console.error("Error loading real market prices:", error);
+      // Fallback to empty data if API fails
+      setAssets({
+        stocks: [],
+        crypto: [],
+        commodities: []
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const currentAssets = assets[activeCategory] || [];
+  
+  const filteredAssets = currentAssets.filter(asset =>
+    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    asset.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const isInWatchlist = (symbol) => {
+    return watchlist.some(item => item.symbol === symbol);
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardContent className="p-12 text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-green-600 mx-auto mb-4" />
+          <p className="text-gray-600">Fetching real market prices...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-green-600" />
+              Market Explorer
+              <Badge className="bg-green-500 text-white">REAL PRICES</Badge>
+            </CardTitle>
+            <p className="text-xs text-gray-500 mt-1">Live market data for practice trading</p>
+            <Button 
+              onClick={loadRealMarketPrices}
+              variant="outline" 
+              size="sm" 
+              className="mt-2"
+            >
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Refresh Prices
+            </Button>
+          </div>
+          <div className="relative w-full lg:w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search assets..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Tabs value={activeCategory} onValueChange={setActiveCategory}>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="stocks">Stocks</TabsTrigger>
+            <TabsTrigger value="crypto">Crypto</TabsTrigger>
+            <TabsTrigger value="commodities">Commodities</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={activeCategory}>
+            <div className="space-y-3">
+              {filteredAssets.map((asset) => (
+                <div
+                  key={asset.symbol}
+                  className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                      <span className="font-bold text-white text-sm">{asset.symbol}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">{asset.name}</p>
+                      <p className="text-sm text-gray-500">{asset.symbol}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right mr-4">
+                    <p className="font-bold text-lg">${asset.price.toLocaleString()}</p>
+                    <div className={`flex items-center gap-1 ${
+                      asset.change >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {asset.change >= 0 ? 
+                        <TrendingUp className="w-4 h-4" /> : 
+                        <TrendingDown className="w-4 h-4" />
+                      }
+                      <span className="text-sm font-medium">
+                        {asset.change >= 0 ? '+' : ''}{asset.change}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onSelectChart && onSelectChart({
+                        symbol: asset.symbol,
+                        asset_name: asset.name,
+                        asset_type: asset.type,
+                        current_price: asset.price
+                      })}
+                    >
+                      Chart
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onAddToWatchlist({
+                        symbol: asset.symbol,
+                        asset_name: asset.name,
+                        asset_type: asset.type,
+                        current_price: asset.price,
+                        price_change_24h: asset.change
+                      })}
+                      disabled={isInWatchlist(asset.symbol)}
+                    >
+                      <Star className={`w-4 h-4 ${isInWatchlist(asset.symbol) ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-gradient-to-r from-green-500 to-emerald-600"
+                      onClick={() => onTrade({
+                        symbol: asset.symbol,
+                        asset_name: asset.name,
+                        asset_type: asset.type,
+                        current_price: asset.price
+                      })}
+                    >
+                      Trade
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {filteredAssets.length === 0 && (
+          <div className="text-center py-12">
+            <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No assets found matching your search</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React from "react";
+import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
+export default function EToroPortfolio({ holdings, onTrade }) {
+  const totalValue = holdings.reduce((sum, h) => sum + (h.total_value || 0), 0);
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <DollarSign className="w-6 h-6 text-green-600" />
+          My Portfolio
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {holdings.length > 0 ? (
+          <div className="space-y-4">
+            {/* Portfolio Summary */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Value</p>
+                  <p className="text-2xl font-bold text-gray-900">${totalValue.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total P/L</p>
+                  <p className={`text-2xl font-bold ${
+                    holdings.reduce((sum, h) => sum + (h.profit_loss || 0), 0) >= 0 
+                      ? 'text-green-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {holdings.reduce((sum, h) => sum + (h.profit_loss || 0), 0) >= 0 ? '+' : ''}
+                    ${holdings.reduce((sum, h) => sum + (h.profit_loss || 0), 0).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Return</p>
+                  <p className={`text-2xl font-bold ${
+                    holdings.reduce((sum, h) => sum + (h.profit_loss_percent || 0), 0) / holdings.length >= 0
+                      ? 'text-green-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {holdings.reduce((sum, h) => sum + (h.profit_loss_percent || 0), 0) / holdings.length >= 0 ? '+' : ''}
+                    {(holdings.reduce((sum, h) => sum + (h.profit_loss_percent || 0), 0) / holdings.length).toFixed(2)}%
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Holdings List */}
+            <div className="space-y-3">
+              {holdings.map((holding) => (
+                <div key={holding.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                      <span className="font-bold text-white text-sm">{holding.symbol}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-gray-900">{holding.asset_name}</p>
+                        <Badge variant="outline" className="text-xs">
+                          {holding.asset_type}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {holding.quantity} shares @ ${holding.average_buy_price?.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right mr-4">
+                    <p className="font-bold text-lg">${holding.total_value?.toFixed(2)}</p>
+                    <div className={`flex items-center justify-end gap-1 text-sm ${
+                      holding.profit_loss >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {holding.profit_loss >= 0 ? 
+                        <TrendingUp className="w-4 h-4" /> : 
+                        <TrendingDown className="w-4 h-4" />
+                      }
+                      <span className="font-medium">
+                        {holding.profit_loss >= 0 ? '+' : ''}${holding.profit_loss?.toFixed(2)} 
+                        ({holding.profit_loss_percent?.toFixed(2)}%)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => onTrade({
+                        symbol: holding.symbol,
+                        asset_name: holding.asset_name,
+                        asset_type: holding.asset_type,
+                        current_price: holding.current_price
+                      })}
+                    >
+                      Trade
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <DollarSign className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Holdings Yet</h3>
+            <p className="text-gray-600 mb-6">Start investing in stocks, crypto, and more</p>
+            <Button className="bg-gradient-to-r from-green-500 to-emerald-600">
+              Start Trading
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState } from "react";
+import { TrendingUp, TrendingDown, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+
+export default function EToroTrade({ onTrade }) {
+  const [tradeData, setTradeData] = useState({
+    symbol: "",
+    asset_name: "",
+    asset_type: "stock",
+    quantity: "",
+    price: "",
+    order_type: "market"
+  });
+  const [isTrading, setIsTrading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (tradeType) => {
+    setError("");
+    
+    if (!tradeData.symbol || !tradeData.quantity || !tradeData.price) {
+      setError("Please fill in all required fields");
+      return;
+    }
+
+    const quantity = parseFloat(tradeData.quantity);
+    const price = parseFloat(tradeData.price);
+
+    if (isNaN(quantity) || quantity <= 0) {
+      setError("Please enter a valid quantity");
+      return;
+    }
+
+    if (isNaN(price) || price <= 0) {
+      setError("Please enter a valid price");
+      return;
+    }
+
+    setIsTrading(true);
+    try {
+      const result = await onTrade({
+        symbol: tradeData.symbol,
+        asset_name: tradeData.asset_name || tradeData.symbol,
+        asset_type: tradeData.asset_type,
+        trade_type: tradeType,
+        quantity: quantity,
+        price: price,
+        total_amount: quantity * price,
+        fees: 0,
+        status: "executed",
+        order_type: tradeData.order_type,
+        trade_id: `ETORO${Date.now()}`
+      });
+
+      if (result.success) {
+        alert(`${tradeType === 'buy' ? 'Buy' : 'Sell'} order executed successfully!`);
+        setTradeData({
+          symbol: "",
+          asset_name: "",
+          asset_type: "stock",
+          quantity: "",
+          price: "",
+          order_type: "market"
+        });
+      } else {
+        setError(result.error || "Trade failed");
+      }
+    } catch (err) {
+      setError("An error occurred while executing the trade");
+      console.error("Trade error:", err);
+    } finally {
+      setIsTrading(false);
+    }
+  };
+
+  const totalAmount = (parseFloat(tradeData.quantity) || 0) * (parseFloat(tradeData.price) || 0);
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Place Trade
+          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-400">
+            PAPER TRADING
+          </Badge>
+        </CardTitle>
+        <p className="text-sm text-gray-600 mt-2">
+          ⚠️ This is simulated trading only. No real money or assets involved.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {error && (
+            <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+              <AlertCircle className="w-5 h-5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="symbol">Symbol *</Label>
+              <Input
+                id="symbol"
+                placeholder="AAPL"
+                value={tradeData.symbol}
+                onChange={(e) => setTradeData({...tradeData, symbol: e.target.value.toUpperCase()})}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="asset_name">Asset Name *</Label>
+              <Input
+                id="asset_name"
+                placeholder="Apple Inc."
+                value={tradeData.asset_name}
+                onChange={(e) => setTradeData({...tradeData, asset_name: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Asset Type</Label>
+              <Select
+                value={tradeData.asset_type}
+                onValueChange={(value) => setTradeData({...tradeData, asset_type: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stock">Stock</SelectItem>
+                  <SelectItem value="crypto">Crypto</SelectItem>
+                  <SelectItem value="commodity">Commodity</SelectItem>
+                  <SelectItem value="forex">Forex</SelectItem>
+                  <SelectItem value="etf">ETF</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Order Type</Label>
+              <Select
+                value={tradeData.order_type}
+                onValueChange={(value) => setTradeData({...tradeData, order_type: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="market">Market Order</SelectItem>
+                  <SelectItem value="limit">Limit Order</SelectItem>
+                  <SelectItem value="stop_loss">Stop Loss</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="quantity">Quantity *</Label>
+              <Input
+                id="quantity"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="10"
+                value={tradeData.quantity}
+                onChange={(e) => setTradeData({...tradeData, quantity: e.target.value})}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="price">Price per Unit *</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="178.25"
+                value={tradeData.price}
+                onChange={(e) => setTradeData({...tradeData, price: e.target.value})}
+              />
+            </div>
+          </div>
+
+          {/* Total Amount Display */}
+          <div className="bg-gray-50 p-4 rounded-lg">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Total Amount:</span>
+              <span className="text-2xl font-bold text-gray-900">
+                ${totalAmount.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          {/* Buy/Sell Buttons */}
+          <div className="grid grid-cols-2 gap-4">
+            <Button
+              onClick={() => handleSubmit('buy')}
+              disabled={isTrading}
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+            >
+              {isTrading ? 'Processing...' : (
+                <>
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Buy
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={() => handleSubmit('sell')}
+              disabled={isTrading}
+              className="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700"
+            >
+              {isTrading ? 'Processing...' : (
+                <>
+                  <TrendingDown className="w-4 h-4 mr-2" />
+                  Sell
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+
+export default function StockPriceChart({ symbol, assetName, currentPrice, assetType = "stock" }) {
+  const [historicalData, setHistoricalData] = useState([]);
+  const [timeframe, setTimeframe] = useState("7d");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadHistoricalData();
+  }, [symbol, timeframe]);
+
+  const loadHistoricalData = async () => {
+    setLoading(true);
+    try {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generate realistic historical price data for ${assetName} (${symbol}) ${assetType} for the past ${timeframe === '24h' ? '24 hours' : timeframe === '7d' ? '7 days' : timeframe === '30d' ? '30 days' : '90 days'}.
+
+Return ${timeframe === '24h' ? 24 : timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90} data points showing realistic price movements.
+Current price is $${currentPrice}. Generate realistic historical data leading to this price.
+
+Format:
+{
+  "data": [
+    { "time": "2024-01-01", "price": 150.25, "volume": 1000000 },
+    ...
+  ]
+}`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  time: { type: "string" },
+                  price: { type: "number" },
+                  volume: { type: "number" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setHistoricalData(response.data || []);
+    } catch (error) {
+      console.error("Error loading historical data:", error);
+      generateFallbackData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateFallbackData = () => {
+    const points = timeframe === '24h' ? 24 : timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
+    const data = [];
+    let price = currentPrice * 0.95;
+    
+    for (let i = 0; i < points; i++) {
+      const change = (Math.random() - 0.48) * (currentPrice * 0.03);
+      price = Math.max(price + change, currentPrice * 0.85);
+      
+      const date = new Date();
+      date.setDate(date.getDate() - (points - i - 1));
+      
+      data.push({
+        time: date.toLocaleDateString(),
+        price: parseFloat(price.toFixed(2)),
+        volume: Math.floor(Math.random() * 1000000) + 500000
+      });
+    }
+    
+    data[data.length - 1].price = currentPrice;
+    setHistoricalData(data);
+  };
+
+  const priceChange = historicalData.length > 1 
+    ? ((historicalData[historicalData.length - 1]?.price - historicalData[0]?.price) / historicalData[0]?.price) * 100 
+    : 0;
+
+  const isPositive = priceChange >= 0;
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            {symbol} Chart
+            {isPositive ? (
+              <TrendingUp className="w-5 h-5 text-green-600" />
+            ) : (
+              <TrendingDown className="w-5 h-5 text-red-600" />
+            )}
+          </CardTitle>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={loadHistoricalData}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        <div className="flex items-center gap-4 mt-2">
+          <p className="text-3xl font-bold">${currentPrice?.toLocaleString()}</p>
+          <span className={`text-lg font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+            {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2 mb-4">
+          {['24h', '7d', '30d', '90d'].map(tf => (
+            <Button
+              key={tf}
+              size="sm"
+              variant={timeframe === tf ? 'default' : 'outline'}
+              onClick={() => setTimeframe(tf)}
+            >
+              {tf}
+            </Button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="h-64 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={historicalData}>
+              <defs>
+                <linearGradient id="colorStockPrice" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={isPositive ? "#10b981" : "#ef4444"} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={isPositive ? "#10b981" : "#ef4444"} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis 
+                dataKey="time" 
+                stroke="#6b7280"
+                tick={{ fontSize: 12 }}
+              />
+              <YAxis 
+                stroke="#6b7280"
+                tick={{ fontSize: 12 }}
+                tickFormatter={(value) => `$${value.toLocaleString()}`}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px'
+                }}
+                formatter={(value, name) => {
+                  if (name === 'price') return [`$${value.toLocaleString()}`, 'Price'];
+                  if (name === 'volume') return [value.toLocaleString(), 'Volume'];
+                  return [value, name];
+                }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="price" 
+                stroke={isPositive ? "#10b981" : "#ef4444"}
+                strokeWidth={2}
+                fillOpacity={1} 
+                fill="url(#colorStockPrice)" 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+

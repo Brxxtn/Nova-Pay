@@ -1,0 +1,142 @@
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { 
+  Home, 
+  CreditCard, 
+  Bitcoin, 
+  ArrowUpRight, 
+  History, 
+  User, 
+  Menu,
+  X,
+  TrendingUp,
+  BarChart3,
+  Camera,
+  Building2,
+  Sparkles,
+  Smartphone,
+  Shield,
+  Target,
+  Settings
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import InactivityMonitor from "@/components/security/InactivityMonitor";
+
+const navigationItems = [
+  { title: "Dashboard", url: createPageUrl("Dashboard"), icon: Home },
+  { title: "JARVIS AI", url: createPageUrl("Jarvis"), icon: Sparkles },
+  { title: "Portfolio", url: createPageUrl("Portfolio"), icon: BarChart3 },
+  { title: "Budget & Goals", url: createPageUrl("Budget"), icon: Target },
+  { title: "Security", url: createPageUrl("Security"), icon: Shield },
+  { title: "Cards", url: createPageUrl("Cards"), icon: CreditCard },
+  { title: "NFC Payments", url: createPageUrl("NFCPayments"), icon: Smartphone },
+  { title: "Crypto", url: createPageUrl("Crypto"), icon: Bitcoin },
+  { title: "eToro Trading", url: createPageUrl("EToro"), icon: TrendingUp },
+  { title: "Transfer", url: createPageUrl("Transfer"), icon: ArrowUpRight },
+  { title: "Check Deposit", url: createPageUrl("CheckDeposit"), icon: Camera },
+  { title: "ACH Payments", url: createPageUrl("ACHPayments"), icon: Building2 },
+  { title: "Transactions", url: createPageUrl("Transactions"), icon: History },
+  { title: "API Config", url: createPageUrl("APIConfig"), icon: Settings },
+  { title: "Profile", url: createPageUrl("Profile"), icon: User },
+];
+
+export default function Layout({ children, currentPageName }) {
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  const publicPages = ["Landing", "About", "Help", "NotFound"];
+  const isPublicPage = publicPages.includes(currentPageName);
+
+  if (isPublicPage) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <InactivityMonitor timeoutMinutes={15} warningMinutes={2} />
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-100">
+        <div className="flex items-center justify-between p-4">
+          <Link to={createPageUrl("Dashboard")} className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-lg font-bold text-gray-900">SLS</span>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </Button>
+        </div>
+        
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="absolute top-full left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-gray-100 shadow-xl max-h-[80vh] overflow-y-auto">
+            <div className="p-4 space-y-2">
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.url}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                    location.pathname === item.url
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
+                      : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium">{item.title}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex lg:fixed lg:inset-y-0 lg:z-50 lg:w-56 lg:flex-col">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white/80 backdrop-blur-xl shadow-2xl px-6 pb-4">
+          <div className="flex h-16 shrink-0 items-center border-b border-gray-100">
+            <Link to={createPageUrl("Dashboard")} className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <CreditCard className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">SLS</h2>
+                <p className="text-xs text-gray-500 font-medium">Nova Pay</p>
+              </div>
+            </Link>
+          </div>
+          <nav className="flex flex-1 flex-col">
+            <ul className="flex flex-1 flex-col gap-y-2">
+              {navigationItems.map((item) => (
+                <li key={item.title}>
+                  <Link
+                    to={item.url}
+                    className={`group flex gap-x-3 rounded-xl p-3 text-sm font-semibold leading-6 transition-all ${
+                      location.pathname === item.url
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                        : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <item.icon className="h-6 w-6 shrink-0" />
+                    {item.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <main className="lg:pl-56 pt-16 lg:pt-0">
+        {children}
+      </main>
+    </div>
+  );
+}

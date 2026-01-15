@@ -1,0 +1,373 @@
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, TrendingDown, PieChart, BarChart3, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+
+/**
+ * Calculate Return on Investment (ROI)
+ */
+const calculateROI = (holdings) => {
+  let totalInvested = 0;
+  let currentValue = 0;
+  
+  holdings.forEach(holding => {
+    const invested = holding.average_buy_price * holding.quantity;
+    const current = holding.current_price * holding.quantity;
+    totalInvested += invested;
+    currentValue += current;
+  });
+  
+  if (totalInvested === 0) return 0;
+  return ((currentValue - totalInvested) / totalInvested) * 100;
+};
+
+/**
+ * Calculate Sharpe Ratio (simplified)
+ * Assumes 2% risk-free rate
+ */
+const calculateSharpeRatio = (holdings, transactions) => {
+  if (holdings.length === 0) return 0;
+  
+  const returns = holdings.map(h => {
+    const invested = h.average_buy_price * h.quantity;
+    const current = h.current_price * h.quantity;
+    return ((current - invested) / invested) * 100;
+  });
+  
+  const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / returns.length;
+  const stdDev = Math.sqrt(variance);
+  
+  const riskFreeRate = 2; // 2% annual risk-free rate
+  
+  if (stdDev === 0) return 0;
+  return (avgReturn - riskFreeRate) / stdDev;
+};
+
+/**
+ * Calculate asset allocation breakdown
+ */
+const calculateAssetAllocation = (holdings, cryptoHoldings = []) => {
+  let totalValue = 0;
+  const allocation = {
+    stocks: 0,
+    crypto: 0,
+    etfs: 0,
+    commodities: 0,
+    forex: 0
+  };
+  
+  // Calculate stock/securities value
+  holdings.forEach(h => {
+    const value = h.current_price * h.quantity;
+    totalValue += value;
+    
+    if (h.asset_type === 'stock') allocation.stocks += value;
+    else if (h.asset_type === 'etf') allocation.etfs += value;
+    else if (h.asset_type === 'commodity') allocation.commodities += value;
+    else if (h.asset_type === 'forex') allocation.forex += value;
+  });
+  
+  // Calculate crypto value
+  cryptoHoldings.forEach(c => {
+    const value = c.current_value || 0;
+    totalValue += value;
+    allocation.crypto += value;
+  });
+  
+  // Convert to percentages
+  Object.keys(allocation).forEach(key => {
+    allocation[key] = totalValue > 0 ? (allocation[key] / totalValue) * 100 : 0;
+  });
+  
+  return { allocation, totalValue };
+};
+
+/**
+ * Calculate portfolio diversification score (0-100)
+ */
+const calculateDiversificationScore = (allocation) => {
+  const values = Object.values(allocation);
+  const nonZero = values.filter(v => v > 0);
+  
+  if (nonZero.length === 0) return 0;
+  
+  // Calculate Herfindahl-Hirschman Index (HHI)
+  const hhi = values.reduce((sum, v) => sum + Math.pow(v, 2), 0) / 100;
+  
+  // Convert to diversification score (lower HHI = better diversification)
+  // Max HHI is 100 (one asset), min is 20 (5 equal assets)
+  const maxHHI = 100;
+  const minHHI = 20;
+  const normalizedScore = ((maxHHI - hhi) / (maxHHI - minHHI)) * 100;
+  
+  return Math.max(0, Math.min(100, normalizedScore));
+};
+
+/**
+ * Generate portfolio recommendations
+ */
+const generateRecommendations = (roi, sharpeRatio, allocation, diversificationScore) => {
+  const recommendations = [];
+  
+  // ROI recommendations
+  if (roi < 0) {
+    recommendations.push({
+      type: 'warning',
+      title: 'Negative Returns',
+      message: 'Your portfolio is currently showing losses. Consider rebalancing or cutting losses on underperforming assets.',
+      priority: 'high'
+    });
+  } else if (roi > 50) {
+    recommendations.push({
+      type: 'success',
+      title: 'Strong Performance',
+      message: 'Excellent returns! Consider taking profits on high-performing positions to lock in gains.',
+      priority: 'medium'
+    });
+  }
+  
+  // Sharpe Ratio recommendations
+  if (sharpeRatio < 0.5) {
+    recommendations.push({
+      type: 'warning',
+      title: 'Low Risk-Adjusted Returns',
+      message: 'Your portfolio has low returns relative to risk. Consider adding stable, dividend-paying assets.',
+      priority: 'high'
+    });
+  } else if (sharpeRatio > 2) {
+    recommendations.push({
+      type: 'success',
+      title: 'Excellent Risk-Adjusted Returns',
+      message: 'Your portfolio shows strong risk-adjusted performance. Maintain this balance.',
+      priority: 'low'
+    });
+  }
+  
+  // Diversification recommendations
+  if (diversificationScore < 40) {
+    recommendations.push({
+      type: 'warning',
+      title: 'Low Diversification',
+      message: 'Your portfolio is heavily concentrated. Consider spreading investments across more asset classes.',
+      priority: 'high'
+    });
+  }
+  
+  // Asset allocation recommendations
+  if (allocation.crypto > 30) {
+    recommendations.push({
+      type: 'info',
+      title: 'High Crypto Exposure',
+      message: 'Crypto assets exceed 30% of your portfolio. Consider the high volatility risk.',
+      priority: 'medium'
+    });
+  }
+  
+  if (allocation.stocks > 70) {
+    recommendations.push({
+      type: 'info',
+      title: 'Stock-Heavy Portfolio',
+      message: 'Your portfolio is heavily weighted in stocks. Consider adding bonds or commodities for stability.',
+      priority: 'medium'
+    });
+  }
+  
+  if (Object.values(allocation).every(v => v < 1)) {
+    recommendations.push({
+      type: 'info',
+      title: 'Start Building Your Portfolio',
+      message: 'Begin by creating a diversified portfolio across multiple asset classes.',
+      priority: 'low'
+    });
+  }
+  
+  return recommendations;
+};
+
+export default function PortfolioAnalytics({ holdings = [], cryptoHoldings = [], transactions = [] }) {
+  const [analytics, setAnalytics] = useState(null);
+  
+  useEffect(() => {
+    calculateAnalytics();
+  }, [holdings, cryptoHoldings, transactions]);
+  
+  const calculateAnalytics = () => {
+    const roi = calculateROI([...holdings, ...cryptoHoldings.map(c => ({
+      average_buy_price: c.average_buy_price,
+      current_price: c.current_value / c.quantity,
+      quantity: c.quantity
+    }))]);
+    
+    const sharpeRatio = calculateSharpeRatio(holdings, transactions);
+    const { allocation, totalValue } = calculateAssetAllocation(holdings, cryptoHoldings);
+    const diversificationScore = calculateDiversificationScore(allocation);
+    const recommendations = generateRecommendations(roi, sharpeRatio, allocation, diversificationScore);
+    
+    setAnalytics({
+      roi,
+      sharpeRatio,
+      allocation,
+      totalValue,
+      diversificationScore,
+      recommendations
+    });
+  };
+  
+  if (!analytics) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-gray-500">Calculating analytics...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  const { roi, sharpeRatio, allocation, totalValue, diversificationScore, recommendations } = analytics;
+  
+  return (
+    <div className="space-y-6">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Portfolio Value</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  ${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <PieChart className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className={`bg-gradient-to-br ${roi >= 0 ? 'from-green-50 to-emerald-50' : 'from-red-50 to-rose-50'}`}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total ROI</p>
+                <p className={`text-2xl font-bold ${roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {roi >= 0 ? '+' : ''}{roi.toFixed(2)}%
+                </p>
+              </div>
+              {roi >= 0 ? 
+                <TrendingUp className="w-8 h-8 text-green-600" /> : 
+                <TrendingDown className="w-8 h-8 text-red-600" />
+              }
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Sharpe Ratio</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {sharpeRatio.toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {sharpeRatio > 2 ? 'Excellent' : sharpeRatio > 1 ? 'Good' : sharpeRatio > 0 ? 'Fair' : 'Poor'}
+                </p>
+              </div>
+              <BarChart3 className="w-8 h-8 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-to-br from-orange-50 to-amber-50">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Diversification</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {diversificationScore.toFixed(0)}/100
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {diversificationScore > 70 ? 'Well Diversified' : diversificationScore > 40 ? 'Moderate' : 'Concentrated'}
+                </p>
+              </div>
+              <PieChart className="w-8 h-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Asset Allocation */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Asset Allocation Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {Object.entries(allocation).map(([asset, percentage]) => (
+              percentage > 0 && (
+                <div key={asset}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium capitalize">{asset}</span>
+                    <span className="text-sm text-gray-600">{percentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${
+                        asset === 'stocks' ? 'bg-blue-600' :
+                        asset === 'crypto' ? 'bg-orange-500' :
+                        asset === 'etfs' ? 'bg-green-600' :
+                        asset === 'commodities' ? 'bg-yellow-600' :
+                        'bg-purple-600'
+                      }`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Recommendations */}
+      {recommendations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Portfolio Optimization Recommendations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {recommendations.map((rec, idx) => (
+                <div
+                  key={idx}
+                  className={`p-4 rounded-lg border-l-4 ${
+                    rec.type === 'warning' ? 'bg-yellow-50 border-yellow-500' :
+                    rec.type === 'success' ? 'bg-green-50 border-green-500' :
+                    'bg-blue-50 border-blue-500'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className={`w-5 h-5 mt-0.5 ${
+                      rec.type === 'warning' ? 'text-yellow-600' :
+                      rec.type === 'success' ? 'text-green-600' :
+                      'text-blue-600'
+                    }`} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-gray-900">{rec.title}</h4>
+                        <Badge variant={rec.priority === 'high' ? 'destructive' : 'secondary'}>
+                          {rec.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-gray-700">{rec.message}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

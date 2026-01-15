@@ -1,0 +1,609 @@
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Upload, FileText, Download } from "lucide-react";
+
+export default function TaxDocuments() {
+  const documents = [
+    { name: "W-2 Form", status: "uploaded", date: "2024-01-15" },
+    { name: "1099-INT", status: "missing", date: null },
+    { name: "1099-DIV", status: "missing", date: null },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Tax Documents
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {documents.map((doc) => (
+              <div key={doc.name} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-6 h-6 text-gray-400" />
+                  <div>
+                    <p className="font-medium">{doc.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {doc.status === 'uploaded' ? `Uploaded ${doc.date}` : 'Not uploaded'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {doc.status === 'uploaded' ? (
+                    <Button size="sm" variant="outline" className="gap-2">
+                      <Download className="w-4 h-4" />
+                      View
+                    </Button>
+                  ) : (
+                    <Button size="sm" className="gap-2">
+                      <Upload className="w-4 h-4" />
+                      Upload
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Download, Eye, FileText } from "lucide-react";
+
+export default function TaxHistory({ taxReturns, isLoading }) {
+  if (isLoading) {
+    return (
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Tax Return History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-gray-100 rounded-xl animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                  <div>
+                    <div className="h-4 w-32 bg-gray-200 rounded"></div>
+                    <div className="h-3 w-24 bg-gray-200 rounded mt-2"></div>
+                  </div>
+                </div>
+                <div className="h-8 w-20 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+      <CardHeader>
+        <CardTitle>Tax Return History</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {taxReturns.length > 0 ? (
+          <div className="space-y-3">
+            {taxReturns.map((taxReturn) => (
+              <div key={taxReturn.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="font-bold text-blue-600">{taxReturn.tax_year}</span>
+                  </div>
+                  <div>
+                    <p className="font-medium">Tax Year {taxReturn.tax_year}</p>
+                    <p className="text-sm text-gray-500">
+                      {taxReturn.filing_status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <p className="font-bold text-lg">
+                      ${taxReturn.refund_amount > 0 ? `+${taxReturn.refund_amount.toFixed(0)}` : taxReturn.federal_tax_owed?.toFixed(0)}
+                    </p>
+                    <Badge variant={taxReturn.status === 'filed' ? 'default' : 'secondary'}>
+                      {taxReturn.status}
+                    </Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1">
+                      <Eye className="w-4 h-4" />
+                      View
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1">
+                      <Download className="w-4 h-4" />
+                      PDF
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900">No Tax Returns Yet</h3>
+            <p className="text-gray-500 mt-2">Start preparing your tax return to see it here.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calculator, FileText, Send, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+export default function TaxPreparation({ currentReturn, transactions, onCreateReturn, onFileReturn }) {
+  const [formData, setFormData] = useState({
+    tax_year: new Date().getFullYear() - 1,
+    filing_status: "single",
+    w2_income: 0,
+    interest_income: 0,
+    dividend_income: 0,
+    capital_gains: 0,
+    deductions: {
+      standard_deduction: 13850, // 2023 standard deduction for single
+      itemized_deductions: 0,
+      mortgage_interest: 0,
+      charitable_donations: 0,
+      state_local_taxes: 0
+    }
+  });
+
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculatedTax, setCalculatedTax] = useState(null);
+  const [showResults, setShowResults] = useState(false);
+
+  useEffect(() => {
+    if (currentReturn) {
+      setFormData({
+        tax_year: currentReturn.tax_year,
+        filing_status: currentReturn.filing_status,
+        w2_income: currentReturn.w2_income || 0,
+        interest_income: currentReturn.interest_income || 0,
+        dividend_income: currentReturn.dividend_income || 0,
+        capital_gains: currentReturn.capital_gains || 0,
+        deductions: currentReturn.deductions || {
+          standard_deduction: 13850,
+          itemized_deductions: 0,
+          mortgage_interest: 0,
+          charitable_donations: 0,
+          state_local_taxes: 0
+        }
+      });
+      if (currentReturn.federal_tax_owed) {
+        setCalculatedTax({
+          totalIncome: currentReturn.total_income,
+          taxableIncome: currentReturn.taxable_income,
+          federalTax: currentReturn.federal_tax_owed,
+          stateTax: currentReturn.state_tax_owed,
+          totalTax: currentReturn.federal_tax_owed + currentReturn.state_tax_owed,
+          refund: currentReturn.refund_amount
+        });
+        setShowResults(true);
+      }
+    }
+  }, [currentReturn]);
+
+  // Calculate income from transactions
+  const calculateIncomeFromTransactions = () => {
+    const currentYear = formData.tax_year;
+    const yearTransactions = transactions.filter(t => {
+      const txDate = new Date(t.created_date);
+      return txDate.getFullYear() === currentYear;
+    });
+
+    const salaryIncome = yearTransactions
+      .filter(t => t.type === 'credit' && t.category !== 'crypto')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const cryptoGains = yearTransactions
+      .filter(t => t.category === 'crypto')
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return { salaryIncome, cryptoGains };
+  };
+
+  const calculateTax = () => {
+    setIsCalculating(true);
+    
+    // Simple tax calculation (this would be more complex in a real app)
+    const totalIncome = parseFloat(formData.w2_income) + 
+                       parseFloat(formData.interest_income) + 
+                       parseFloat(formData.dividend_income) + 
+                       parseFloat(formData.capital_gains);
+    
+    const standardDeduction = formData.deductions.standard_deduction;
+    const itemizedDeductions = parseFloat(formData.deductions.mortgage_interest || 0) + 
+                              parseFloat(formData.deductions.charitable_donations || 0) + 
+                              parseFloat(formData.deductions.state_local_taxes || 0);
+    
+    const deduction = Math.max(standardDeduction, itemizedDeductions);
+    const taxableIncome = Math.max(0, totalIncome - deduction);
+    
+    // Simplified tax brackets for single filers (2023)
+    let federalTax = 0;
+    if (taxableIncome <= 11000) {
+      federalTax = taxableIncome * 0.1;
+    } else if (taxableIncome <= 44725) {
+      federalTax = 1100 + (taxableIncome - 11000) * 0.12;
+    } else if (taxableIncome <= 95375) {
+      federalTax = 5147 + (taxableIncome - 44725) * 0.22;
+    } else {
+      federalTax = 16290 + (taxableIncome - 95375) * 0.24;
+    }
+
+    const stateTax = taxableIncome * 0.05; // 5% state tax example
+    const totalTax = federalTax + stateTax;
+    
+    // Assuming some withholding happened throughout the year
+    const estimatedWithholding = totalIncome * 0.15;
+    const refund = Math.max(0, estimatedWithholding - totalTax);
+    const amountOwed = Math.max(0, totalTax - estimatedWithholding);
+    
+    setCalculatedTax({
+      totalIncome,
+      taxableIncome,
+      federalTax,
+      stateTax,
+      totalTax,
+      refund: refund > 0 ? refund : 0,
+      amountOwed: amountOwed > 0 ? amountOwed : 0
+    });
+    
+    setShowResults(true);
+    setIsCalculating(false);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!calculatedTax) {
+      calculateTax();
+      return;
+    }
+
+    await onCreateReturn({
+      ...formData,
+      total_income: calculatedTax.totalIncome,
+      taxable_income: calculatedTax.taxableIncome,
+      federal_tax_owed: calculatedTax.federalTax,
+      state_tax_owed: calculatedTax.stateTax,
+      refund_amount: calculatedTax.refund,
+      status: "review"
+    });
+  };
+
+  const { salaryIncome, cryptoGains } = calculateIncomeFromTransactions();
+
+  return (
+    <div className="space-y-6">
+      {/* Auto-calculated Income from Transactions */}
+      {(salaryIncome > 0 || cryptoGains > 0) && (
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="w-5 h-5 text-blue-600" />
+              Income from Your Transactions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                We've calculated your income based on your transaction history. Please verify and adjust as needed.
+              </AlertDescription>
+            </Alert>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-600">Estimated W-2 Income</p>
+                <p className="text-2xl font-bold text-blue-600">${salaryIncome.toFixed(2)}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setFormData({...formData, w2_income: salaryIncome})}
+                >
+                  Use This Amount
+                </Button>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Capital Gains (Crypto)</p>
+                <p className="text-2xl font-bold text-blue-600">${cryptoGains.toFixed(2)}</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setFormData({...formData, capital_gains: cryptoGains})}
+                >
+                  Use This Amount
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tax Form */}
+      <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle>Tax Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Filing Status</Label>
+                <Select
+                  value={formData.filing_status}
+                  onValueChange={(value) => setFormData({...formData, filing_status: value})}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="married_joint">Married Filing Jointly</SelectItem>
+                    <SelectItem value="married_separate">Married Filing Separately</SelectItem>
+                    <SelectItem value="head_of_household">Head of Household</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Tax Year</Label>
+                <Input
+                  type="number"
+                  value={formData.tax_year}
+                  onChange={(e) => setFormData({...formData, tax_year: parseInt(e.target.value)})}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Income</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>W-2 Wages ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.w2_income}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({...formData, w2_income: value});
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Interest Income ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.interest_income}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({...formData, interest_income: value});
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dividend Income ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.dividend_income}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({...formData, dividend_income: value});
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Capital Gains ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.capital_gains}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({...formData, capital_gains: value});
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Deductions</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Mortgage Interest ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.deductions.mortgage_interest}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({
+                          ...formData,
+                          deductions: {...formData.deductions, mortgage_interest: value}
+                        });
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Charitable Donations ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.deductions.charitable_donations}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({
+                          ...formData,
+                          deductions: {...formData.deductions, charitable_donations: value}
+                        });
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>State/Local Taxes ($)</Label>
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={formData.deductions.state_local_taxes}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setFormData({
+                          ...formData,
+                          deductions: {...formData.deductions, state_local_taxes: value}
+                        });
+                      }
+                    }}
+                    className="[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {showResults && calculatedTax && (
+              <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                <CardHeader>
+                  <CardTitle className="text-green-800">Tax Calculation Results</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div className="flex justify-between">
+                      <span>Total Income:</span>
+                      <span className="font-medium">${calculatedTax.totalIncome.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Taxable Income:</span>
+                      <span className="font-medium">${calculatedTax.taxableIncome.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Federal Tax:</span>
+                      <span className="font-medium">${calculatedTax.federalTax.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>State Tax:</span>
+                      <span className="font-medium">${calculatedTax.stateTax.toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-green-300">
+                    {calculatedTax.refund > 0 ? (
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-green-800">Estimated Refund:</span>
+                        <span className="text-3xl font-bold text-green-800">${calculatedTax.refund.toFixed(2)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-semibold text-red-800">Amount Owed:</span>
+                        <span className="text-3xl font-bold text-red-800">${calculatedTax.amountOwed.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex justify-end gap-3">
+              {!showResults ? (
+                <Button 
+                  type="submit"
+                  disabled={isCalculating}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600"
+                >
+                  {isCalculating ? 'Calculating...' : 'Calculate Tax'}
+                </Button>
+              ) : (
+                <>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowResults(false);
+                      setCalculatedTax(null);
+                    }}
+                  >
+                    Recalculate
+                  </Button>
+                  <Button 
+                    type="submit"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600"
+                  >
+                    Save Return
+                  </Button>
+                  {currentReturn && currentReturn.status === 'review' && (
+                    <Button 
+                      type="button"
+                      onClick={() => onFileReturn(currentReturn.id)}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      File Return
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+
+

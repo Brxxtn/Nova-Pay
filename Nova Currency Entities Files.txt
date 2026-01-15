@@ -1,0 +1,1743 @@
+{
+  "name": "Account",
+  "type": "object",
+  "properties": {
+    "balance": {
+      "type": "number",
+      "description": "Account balance in USD",
+      "default": 0
+    },
+    "account_number": {
+      "type": "string",
+      "description": "Unique account number"
+    },
+    "routing_number": {
+      "type": "string",
+      "description": "Bank routing number"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "checking",
+        "savings"
+      ],
+      "default": "checking"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "closed"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "account_number",
+    "routing_number"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    },
+    "write": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "Card",
+  "type": "object",
+  "properties": {
+    "card_type": {
+      "type": "string",
+      "enum": [
+        "payment",
+        "gift",
+        "loyalty",
+        "id",
+        "passport"
+      ],
+      "description": "Type of card"
+    },
+    "card_name": {
+      "type": "string",
+      "description": "Name/title of the card"
+    },
+    "card_number": {
+      "type": "string",
+      "description": "Card number or ID"
+    },
+    "cvv": {
+      "type": "string",
+      "description": "Card CVV (3-4 digits)"
+    },
+    "zip_code": {
+      "type": "string",
+      "description": "Billing ZIP code"
+    },
+    "payment_network": {
+      "type": "string",
+      "enum": [
+        "visa",
+        "mastercard",
+        "american_express",
+        "discover"
+      ],
+      "description": "Payment network (for payment cards only)"
+    },
+    "card_variant": {
+      "type": "string",
+      "enum": [
+        "virtual",
+        "physical"
+      ],
+      "default": "physical",
+      "description": "Whether card is virtual or physical"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "frozen",
+        "expired",
+        "cancelled"
+      ],
+      "default": "active"
+    },
+    "expiry_date": {
+      "type": "string",
+      "description": "Expiry date (MM/YY format)"
+    },
+    "balance": {
+      "type": "number",
+      "description": "Current balance (for gift cards)"
+    },
+    "issuer": {
+      "type": "string",
+      "description": "Card issuer or brand name"
+    },
+    "barcode_data": {
+      "type": "string",
+      "description": "Barcode or QR code data"
+    },
+    "barcode_type": {
+      "type": "string",
+      "enum": [
+        "qr",
+        "code128",
+        "ean13",
+        "none"
+      ],
+      "default": "none",
+      "description": "Type of barcode"
+    },
+    "member_id": {
+      "type": "string",
+      "description": "Membership ID (for loyalty cards)"
+    },
+    "points_balance": {
+      "type": "number",
+      "description": "Points balance (for loyalty cards)"
+    },
+    "id_number": {
+      "type": "string",
+      "description": "ID number (for ID cards and passports)"
+    },
+    "issue_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Issue date (for IDs and passports)"
+    },
+    "country": {
+      "type": "string",
+      "description": "Country of issue (for passports)"
+    },
+    "color_scheme": {
+      "type": "string",
+      "enum": [
+        "blue",
+        "purple",
+        "green",
+        "orange",
+        "red",
+        "gold",
+        "silver",
+        "black"
+      ],
+      "default": "blue",
+      "description": "Visual color scheme for the card"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes or information"
+    }
+  },
+  "required": [
+    "card_type",
+    "card_name"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "Transaction",
+  "type": "object",
+  "properties": {
+    "amount": {
+      "type": "number",
+      "description": "Transaction amount"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "debit",
+        "credit",
+        "crypto_buy",
+        "crypto_sell",
+        "transfer_in",
+        "transfer_out"
+      ],
+      "description": "Transaction type"
+    },
+    "description": {
+      "type": "string",
+      "description": "Transaction description"
+    },
+    "merchant": {
+      "type": "string",
+      "description": "Merchant name if applicable"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "food",
+        "shopping",
+        "gas",
+        "entertainment",
+        "bills",
+        "crypto",
+        "transfer",
+        "other"
+      ],
+      "default": "other"
+    },
+    "card_id": {
+      "type": "string",
+      "description": "Related card ID if applicable"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "completed",
+        "failed"
+      ],
+      "default": "completed"
+    },
+    "reference_id": {
+      "type": "string",
+      "description": "Unique transaction reference"
+    }
+  },
+  "required": [
+    "amount",
+    "type",
+    "description"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "CryptoCurrency",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Crypto symbol (e.g., BTC, ETH)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Full cryptocurrency name"
+    },
+    "current_price": {
+      "type": "number",
+      "description": "Current price in USD"
+    },
+    "price_change_24h": {
+      "type": "number",
+      "description": "24h price change percentage"
+    },
+    "market_cap": {
+      "type": "number",
+      "description": "Market capitalization"
+    },
+    "rank": {
+      "type": "number",
+      "description": "Market cap rank"
+    },
+    "icon_url": {
+      "type": "string",
+      "description": "Cryptocurrency icon URL"
+    }
+  },
+  "required": [
+    "symbol",
+    "name",
+    "current_price"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
+
+{
+  "name": "CryptoHolding",
+  "type": "object",
+  "properties": {
+    "crypto_symbol": {
+      "type": "string",
+      "description": "Cryptocurrency symbol"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Amount of cryptocurrency owned"
+    },
+    "average_buy_price": {
+      "type": "number",
+      "description": "Average purchase price in USD"
+    },
+    "current_value": {
+      "type": "number",
+      "description": "Current value in USD"
+    }
+  },
+  "required": [
+    "crypto_symbol",
+    "quantity"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "PayStub",
+  "type": "object",
+  "properties": {
+    "employee_name": {
+      "type": "string",
+      "description": "Employee full name"
+    },
+    "employee_id": {
+      "type": "string",
+      "description": "Employee ID number"
+    },
+    "employer_name": {
+      "type": "string",
+      "description": "Employer/Company name"
+    },
+    "pay_period_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Pay period start date"
+    },
+    "pay_period_end": {
+      "type": "string",
+      "format": "date",
+      "description": "Pay period end date"
+    },
+    "pay_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of payment"
+    },
+    "gross_pay": {
+      "type": "number",
+      "description": "Total gross pay"
+    },
+    "hourly_rate": {
+      "type": "number",
+      "description": "Hourly rate if applicable"
+    },
+    "hours_worked": {
+      "type": "number",
+      "description": "Hours worked if applicable"
+    },
+    "salary": {
+      "type": "number",
+      "description": "Annual salary if applicable"
+    },
+    "deductions": {
+      "type": "object",
+      "properties": {
+        "federal_tax": {
+          "type": "number",
+          "default": 0
+        },
+        "state_tax": {
+          "type": "number",
+          "default": 0
+        },
+        "social_security": {
+          "type": "number",
+          "default": 0
+        },
+        "medicare": {
+          "type": "number",
+          "default": 0
+        },
+        "health_insurance": {
+          "type": "number",
+          "default": 0
+        },
+        "retirement_401k": {
+          "type": "number",
+          "default": 0
+        },
+        "other": {
+          "type": "number",
+          "default": 0
+        }
+      }
+    },
+    "net_pay": {
+      "type": "number",
+      "description": "Net pay after deductions"
+    },
+    "ytd_gross": {
+      "type": "number",
+      "description": "Year-to-date gross pay"
+    },
+    "ytd_net": {
+      "type": "number",
+      "description": "Year-to-date net pay"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "generated",
+        "sent"
+      ],
+      "default": "draft"
+    }
+  },
+  "required": [
+    "employee_name",
+    "employer_name",
+    "pay_period_start",
+    "pay_period_end",
+    "gross_pay"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "TaxDocument",
+  "type": "object",
+  "properties": {
+    "tax_year": {
+      "type": "number",
+      "description": "Tax year (e.g., 2023)"
+    },
+    "filing_status": {
+      "type": "string",
+      "enum": [
+        "single",
+        "married_joint",
+        "married_separate",
+        "head_of_household"
+      ],
+      "description": "Filing status"
+    },
+    "total_income": {
+      "type": "number",
+      "description": "Total income for the year"
+    },
+    "w2_income": {
+      "type": "number",
+      "description": "W-2 wage income"
+    },
+    "interest_income": {
+      "type": "number",
+      "description": "Interest income"
+    },
+    "dividend_income": {
+      "type": "number",
+      "description": "Dividend income"
+    },
+    "capital_gains": {
+      "type": "number",
+      "description": "Capital gains/losses"
+    },
+    "deductions": {
+      "type": "object",
+      "properties": {
+        "standard_deduction": {
+          "type": "number",
+          "default": 0
+        },
+        "itemized_deductions": {
+          "type": "number",
+          "default": 0
+        },
+        "mortgage_interest": {
+          "type": "number",
+          "default": 0
+        },
+        "charitable_donations": {
+          "type": "number",
+          "default": 0
+        },
+        "state_local_taxes": {
+          "type": "number",
+          "default": 0
+        }
+      }
+    },
+    "taxable_income": {
+      "type": "number",
+      "description": "Taxable income after deductions"
+    },
+    "federal_tax_owed": {
+      "type": "number",
+      "description": "Federal tax owed"
+    },
+    "state_tax_owed": {
+      "type": "number",
+      "description": "State tax owed"
+    },
+    "refund_amount": {
+      "type": "number",
+      "description": "Refund amount if applicable"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "review",
+        "filed",
+        "accepted"
+      ],
+      "default": "draft"
+    },
+    "filing_method": {
+      "type": "string",
+      "enum": [
+        "e-file",
+        "mail"
+      ],
+      "default": "e-file"
+    }
+  },
+  "required": [
+    "tax_year",
+    "filing_status",
+    "total_income"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "EToroHolding",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Stock/asset symbol (e.g., AAPL, TSLA)"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Full asset name"
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "stock",
+        "crypto",
+        "commodity",
+        "forex",
+        "etf"
+      ],
+      "description": "Type of asset"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Number of shares/units owned"
+    },
+    "average_buy_price": {
+      "type": "number",
+      "description": "Average purchase price per unit"
+    },
+    "current_price": {
+      "type": "number",
+      "description": "Current market price"
+    },
+    "total_value": {
+      "type": "number",
+      "description": "Total position value (quantity \u00d7 current_price)"
+    },
+    "profit_loss": {
+      "type": "number",
+      "description": "Unrealized profit/loss"
+    },
+    "profit_loss_percent": {
+      "type": "number",
+      "description": "Profit/loss percentage"
+    }
+  },
+  "required": [
+    "symbol",
+    "asset_name",
+    "asset_type",
+    "quantity",
+    "average_buy_price"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "EToroTrade",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Asset symbol"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Asset name"
+    },
+    "trade_type": {
+      "type": "string",
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "description": "Buy or sell"
+    },
+    "quantity": {
+      "type": "number",
+      "description": "Number of units traded"
+    },
+    "price": {
+      "type": "number",
+      "description": "Execution price per unit"
+    },
+    "total_amount": {
+      "type": "number",
+      "description": "Total transaction amount"
+    },
+    "fees": {
+      "type": "number",
+      "description": "Trading fees",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "executed",
+        "cancelled",
+        "failed"
+      ],
+      "default": "executed"
+    },
+    "order_type": {
+      "type": "string",
+      "enum": [
+        "market",
+        "limit",
+        "stop_loss"
+      ],
+      "default": "market"
+    },
+    "trade_id": {
+      "type": "string",
+      "description": "Unique trade identifier"
+    }
+  },
+  "required": [
+    "symbol",
+    "asset_name",
+    "trade_type",
+    "quantity",
+    "price",
+    "total_amount"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "EToroWatchlist",
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string",
+      "description": "Asset symbol"
+    },
+    "asset_name": {
+      "type": "string",
+      "description": "Full asset name"
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "stock",
+        "crypto",
+        "commodity",
+        "forex",
+        "etf"
+      ],
+      "description": "Type of asset"
+    },
+    "current_price": {
+      "type": "number",
+      "description": "Current market price"
+    },
+    "price_change_24h": {
+      "type": "number",
+      "description": "24h price change percentage"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Personal notes about this asset"
+    }
+  },
+  "required": [
+    "symbol",
+    "asset_name",
+    "asset_type"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "SavingsGoal",
+  "type": "object",
+  "properties": {
+    "goal_name": {
+      "type": "string",
+      "description": "Name of the savings goal"
+    },
+    "target_amount": {
+      "type": "number",
+      "description": "Target amount to save"
+    },
+    "current_amount": {
+      "type": "number",
+      "description": "Current saved amount",
+      "default": 0
+    },
+    "target_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Target completion date"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "vacation",
+        "house",
+        "car",
+        "emergency",
+        "education",
+        "retirement",
+        "other"
+      ],
+      "description": "Goal category"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium",
+      "description": "Goal priority"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "paused"
+      ],
+      "default": "active",
+      "description": "Goal status"
+    },
+    "auto_save_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatic savings enabled"
+    },
+    "auto_save_amount": {
+      "type": "number",
+      "description": "Amount to auto-save per period"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes"
+    }
+  },
+  "required": [
+    "goal_name",
+    "target_amount",
+    "target_date",
+    "category"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    },
+    "write": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "BillReminder",
+  "type": "object",
+  "properties": {
+    "bill_name": {
+      "type": "string",
+      "description": "Name of the bill (e.g., Netflix, Rent)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Bill amount"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "utilities",
+        "rent",
+        "subscription",
+        "insurance",
+        "loan",
+        "credit_card",
+        "other"
+      ],
+      "description": "Bill category"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Next due date"
+    },
+    "frequency": {
+      "type": "string",
+      "enum": [
+        "weekly",
+        "biweekly",
+        "monthly",
+        "quarterly",
+        "yearly"
+      ],
+      "default": "monthly",
+      "description": "Payment frequency"
+    },
+    "auto_pay_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Auto-pay enabled"
+    },
+    "reminder_days_before": {
+      "type": "number",
+      "default": 3,
+      "description": "Days before to send reminder"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paid",
+        "overdue",
+        "cancelled"
+      ],
+      "default": "active",
+      "description": "Bill status"
+    },
+    "merchant": {
+      "type": "string",
+      "description": "Bill merchant/provider"
+    },
+    "last_paid_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Last payment date"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes"
+    }
+  },
+  "required": [
+    "bill_name",
+    "amount",
+    "category",
+    "due_date"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "CheckDeposit",
+  "type": "object",
+  "properties": {
+    "check_amount": {
+      "type": "number",
+      "description": "Amount written on the check"
+    },
+    "check_number": {
+      "type": "string",
+      "description": "Check number"
+    },
+    "front_image_url": {
+      "type": "string",
+      "description": "URL of check front image"
+    },
+    "back_image_url": {
+      "type": "string",
+      "description": "URL of check back image"
+    },
+    "routing_number": {
+      "type": "string",
+      "description": "Bank routing number from check"
+    },
+    "account_number": {
+      "type": "string",
+      "description": "Account number from check"
+    },
+    "payee_name": {
+      "type": "string",
+      "description": "Name on the check"
+    },
+    "memo": {
+      "type": "string",
+      "description": "Memo line from check"
+    },
+    "deposit_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of deposit"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "processing",
+        "cleared",
+        "rejected",
+        "on_hold"
+      ],
+      "default": "pending",
+      "description": "Deposit status"
+    },
+    "cleared_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when funds cleared"
+    },
+    "hold_amount": {
+      "type": "number",
+      "description": "Amount on hold",
+      "default": 0
+    },
+    "available_amount": {
+      "type": "number",
+      "description": "Amount available immediately",
+      "default": 0
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Reason for rejection if applicable"
+    },
+    "fraud_score": {
+      "type": "number",
+      "description": "Fraud detection score (0-100)",
+      "default": 0
+    },
+    "image_quality_score": {
+      "type": "number",
+      "description": "Image quality score (0-100)",
+      "default": 0
+    }
+  },
+  "required": [
+    "check_amount",
+    "front_image_url",
+    "deposit_date"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "ExternalBankAccount",
+  "type": "object",
+  "properties": {
+    "bank_name": {
+      "type": "string",
+      "description": "Name of the bank"
+    },
+    "account_holder_name": {
+      "type": "string",
+      "description": "Name on the account"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "checking",
+        "savings"
+      ],
+      "description": "Type of account"
+    },
+    "routing_number": {
+      "type": "string",
+      "description": "9-digit routing number"
+    },
+    "account_number": {
+      "type": "string",
+      "description": "Account number (encrypted)"
+    },
+    "account_number_last4": {
+      "type": "string",
+      "description": "Last 4 digits for display"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "microdeposit_sent",
+        "verified",
+        "failed"
+      ],
+      "default": "pending",
+      "description": "Verification status"
+    },
+    "verification_method": {
+      "type": "string",
+      "enum": [
+        "microdeposit",
+        "instant",
+        "manual"
+      ],
+      "default": "microdeposit",
+      "description": "How account was verified"
+    },
+    "microdeposit_amount1": {
+      "type": "number",
+      "description": "First microdeposit amount"
+    },
+    "microdeposit_amount2": {
+      "type": "number",
+      "description": "Second microdeposit amount"
+    },
+    "verification_attempts": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of verification attempts"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "suspended",
+        "closed"
+      ],
+      "default": "active",
+      "description": "Account status"
+    },
+    "is_default": {
+      "type": "boolean",
+      "default": false,
+      "description": "Default account for transfers"
+    },
+    "verified_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date account was verified"
+    }
+  },
+  "required": [
+    "bank_name",
+    "account_holder_name",
+    "account_type",
+    "routing_number",
+    "account_number"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "ACHTransaction",
+  "type": "object",
+  "properties": {
+    "transaction_type": {
+      "type": "string",
+      "enum": [
+        "debit",
+        "credit"
+      ],
+      "description": "ACH debit (pull) or credit (push)"
+    },
+    "amount": {
+      "type": "number",
+      "description": "Transaction amount"
+    },
+    "external_account_id": {
+      "type": "string",
+      "description": "Reference to ExternalBankAccount"
+    },
+    "recipient_name": {
+      "type": "string",
+      "description": "Name of recipient"
+    },
+    "recipient_account_last4": {
+      "type": "string",
+      "description": "Last 4 of recipient account"
+    },
+    "recipient_bank_name": {
+      "type": "string",
+      "description": "Recipient's bank name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Transaction description"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "initiated",
+        "pending",
+        "processing",
+        "completed",
+        "failed",
+        "returned",
+        "cancelled"
+      ],
+      "default": "initiated",
+      "description": "ACH transaction status"
+    },
+    "initiated_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date transaction was initiated"
+    },
+    "expected_settlement_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Expected settlement date (typically 1-3 business days)"
+    },
+    "actual_settlement_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Actual settlement date"
+    },
+    "ach_trace_number": {
+      "type": "string",
+      "description": "ACH trace/reference number"
+    },
+    "sec_code": {
+      "type": "string",
+      "enum": [
+        "WEB",
+        "PPD",
+        "CCD",
+        "TEL"
+      ],
+      "default": "WEB",
+      "description": "Standard Entry Class code"
+    },
+    "return_code": {
+      "type": "string",
+      "description": "ACH return code if applicable"
+    },
+    "return_reason": {
+      "type": "string",
+      "description": "Reason for return if applicable"
+    },
+    "fee_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Transaction fee"
+    },
+    "is_recurring": {
+      "type": "boolean",
+      "default": false,
+      "description": "Part of recurring payment series"
+    },
+    "recurring_schedule_id": {
+      "type": "string",
+      "description": "Reference to recurring schedule"
+    },
+    "authorization_method": {
+      "type": "string",
+      "enum": [
+        "online",
+        "phone",
+        "written"
+      ],
+      "default": "online",
+      "description": "How authorization was obtained"
+    }
+  },
+  "required": [
+    "transaction_type",
+    "amount",
+    "recipient_name",
+    "initiated_date"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "InvestmentGoal",
+  "type": "object",
+  "properties": {
+    "goal_name": {
+      "type": "string",
+      "description": "Name of the investment goal"
+    },
+    "goal_type": {
+      "type": "string",
+      "enum": [
+        "retirement",
+        "down_payment",
+        "education",
+        "vacation",
+        "emergency_fund",
+        "wealth_building",
+        "other"
+      ],
+      "description": "Type of investment goal"
+    },
+    "target_amount": {
+      "type": "number",
+      "description": "Target amount to achieve"
+    },
+    "current_amount": {
+      "type": "number",
+      "description": "Current allocated amount",
+      "default": 0
+    },
+    "target_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Target completion date"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium",
+      "description": "Goal priority"
+    },
+    "allocated_cryptos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "value_usd": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Cryptocurrencies allocated to this goal"
+    },
+    "allocated_stocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "value_usd": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Stocks allocated to this goal"
+    },
+    "monthly_contribution": {
+      "type": "number",
+      "description": "Planned monthly contribution amount",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "paused",
+        "abandoned"
+      ],
+      "default": "active",
+      "description": "Goal status"
+    },
+    "progress_percentage": {
+      "type": "number",
+      "description": "Percentage of goal achieved",
+      "default": 0
+    },
+    "ai_recommendations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "AI-generated recommendations for achieving goal"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes"
+    }
+  },
+  "required": [
+    "goal_name",
+    "goal_type",
+    "target_amount",
+    "target_date"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "TradingStrategy",
+  "type": "object",
+  "properties": {
+    "strategy_name": {
+      "type": "string",
+      "description": "Name of the trading strategy"
+    },
+    "crypto_symbol": {
+      "type": "string",
+      "description": "Cryptocurrency symbol to trade"
+    },
+    "strategy_type": {
+      "type": "string",
+      "enum": [
+        "price_drop",
+        "price_rise",
+        "dca",
+        "ai_driven",
+        "rsi",
+        "moving_average"
+      ],
+      "description": "Type of trading strategy"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "buy",
+        "sell",
+        "both"
+      ],
+      "description": "Action to take when conditions are met"
+    },
+    "buy_conditions": {
+      "type": "object",
+      "properties": {
+        "price_threshold": {
+          "type": "number"
+        },
+        "percentage_drop": {
+          "type": "number"
+        },
+        "amount_usd": {
+          "type": "number"
+        },
+        "quantity": {
+          "type": "number"
+        }
+      },
+      "description": "Conditions for buying"
+    },
+    "sell_conditions": {
+      "type": "object",
+      "properties": {
+        "price_threshold": {
+          "type": "number"
+        },
+        "percentage_rise": {
+          "type": "number"
+        },
+        "take_profit_percentage": {
+          "type": "number"
+        },
+        "stop_loss_percentage": {
+          "type": "number"
+        },
+        "quantity": {
+          "type": "number"
+        }
+      },
+      "description": "Conditions for selling"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether strategy is active"
+    },
+    "use_ai_predictions": {
+      "type": "boolean",
+      "default": false,
+      "description": "Use AI to predict optimal trade timing"
+    },
+    "max_trades_per_day": {
+      "type": "number",
+      "default": 5,
+      "description": "Maximum trades per day"
+    },
+    "trades_today": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of trades executed today"
+    },
+    "last_executed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last execution timestamp"
+    },
+    "total_executions": {
+      "type": "number",
+      "default": 0,
+      "description": "Total number of times executed"
+    },
+    "total_profit_loss": {
+      "type": "number",
+      "default": 0,
+      "description": "Total profit/loss from this strategy"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "completed"
+      ],
+      "default": "active"
+    }
+  },
+  "required": [
+    "strategy_name",
+    "crypto_symbol",
+    "strategy_type",
+    "action"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+{
+  "name": "SecurityEvent",
+  "type": "object",
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "login",
+        "failed_login",
+        "mfa_enabled",
+        "mfa_disabled",
+        "suspicious_transaction",
+        "large_transfer",
+        "password_change",
+        "device_added",
+        "api_key_access"
+      ],
+      "description": "Type of security event"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "default": "info",
+      "description": "Event severity level"
+    },
+    "description": {
+      "type": "string",
+      "description": "Event description"
+    },
+    "ip_address": {
+      "type": "string",
+      "description": "IP address associated with event"
+    },
+    "device_info": {
+      "type": "string",
+      "description": "Device information"
+    },
+    "location": {
+      "type": "string",
+      "description": "Geographic location"
+    },
+    "was_blocked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the action was blocked"
+    },
+    "requires_action": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether user action is required"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional event metadata"
+    }
+  },
+  "required": [
+    "event_type",
+    "description"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "created_by": "{{user.email}}"
+    },
+    "update": {
+      "created_by": "{{user.email}}"
+    },
+    "delete": {
+      "created_by": "{{user.email}}"
+    }
+  }
+}
+
+
+
